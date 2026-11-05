@@ -1,0 +1,27 @@
+# --- Python / Django ---
+*.pyc
+*.pyo
+*.pyd
+__pycache__/*
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Database
+db.sqlite3
+db.sqlite3-journal
+
+# Settings / Environment variables
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# --- React / Frontend (когато го направите) ---
+node_modules/
+build/
+dist/
+.DS_Store

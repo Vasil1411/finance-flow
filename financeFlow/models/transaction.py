@@ -7,8 +7,8 @@ from .category import Category
 
 class Transaction(models.Model):
     TRANSACTION_TYPES = (
-        ('INCOME'),
-        ('EXPENSE'),
+        ('INCOME', 'Income'),
+        ('EXPENSE', 'Expense'),
     )
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions')
@@ -36,4 +36,4 @@ class Transaction(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.type}: {self.amount} ({self.date})"
+        return f"{self.type}: {self.amount} - ({self.date})"
