@@ -27,6 +27,15 @@ class RegisterSerializer(serializers.ModelSerializer):
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
+        fields = ['id', 'name', 'type', 'allocation_type']
+        read_only_fields = ['user']  # User is automatically assigned from the request
+
+    def create(self, validated_data):
+        # Automatically assign the currently authenticated user to the category
+        validated_data['user'] = self.context['request'].user
+        return super().create(validated_data)
+    class Meta:
+        model = Category
         fields = ['id', 'name', 'type']
         read_only_fields = ['user']
 
