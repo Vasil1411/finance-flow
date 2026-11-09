@@ -9,4 +9,11 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # Return categories belonging only to the authenticated user
-        return Category.objects.filter(user=self.request.user)
+        queryset = Category.objects.filter(user=self.request.user)
+        
+        # Filter by allocation_type (for example ?allocation_type=NEEDS)
+        allocation_type = self.request.query_params.get('allocation_type')
+        if allocation_type and allocation_type.upper() != 'ALL':
+            queryset = queryset.filter(allocation_type=allocation_type.upper())
+            
+        return queryset
