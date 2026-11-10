@@ -1,6 +1,6 @@
-import React, {type ReactNode}  from "react";
+import React, { type ReactNode } from "react";
 import { Icon } from "./Icon";
-import {type IconName} from "../types/icons";
+import { type IconName } from "../types/icons";
 
 export const Logo: React.FC<{ compact?: boolean }> = ({ compact = false }) => (
   <div className="logo">
@@ -15,12 +15,10 @@ export const Logo: React.FC<{ compact?: boolean }> = ({ compact = false }) => (
   </div>
 );
 
-interface ButtonProps {
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
   variant?: "primary" | "secondary" | "ghost";
   icon?: IconName;
-  onClick?: () => void;
-  type?: "button" | "submit";
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -29,8 +27,16 @@ export const Button: React.FC<ButtonProps> = ({
   icon,
   onClick,
   type = "button",
+  disabled,
+  ...rest // 
 }) => (
-  <button className={`btn btn-${variant}`} onClick={onClick} type={type}>
+  <button 
+    className={`btn btn-${variant}`} 
+    onClick={onClick} 
+    type={type} 
+    disabled={disabled}
+    {...rest}
+  >
     {icon && <Icon name={icon} size={17} />}
     {children}
   </button>

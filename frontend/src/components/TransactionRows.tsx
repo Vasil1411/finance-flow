@@ -2,7 +2,6 @@ import React from 'react';
 import { Icon } from './Icon';
 import type { Transaction } from '../types/transaction';
 
-// Можеш да изнесеш categories в отделен constants файл, засега ги държим тук или в types
 const categories: Record<string, { color: string; bg: string; icon: string }> = {
   Salary: { color: "#2A9D70", bg: "#E8F7F1", icon: "S" },
   Groceries: { color: "#E17A4A", bg: "#FFF1E9", icon: "G" },
@@ -31,7 +30,10 @@ export const TransactionRows: React.FC<TransactionRowsProps> = ({ rows, compact 
         {!compact && <span />}
       </div>
       {rows.map((t) => {
-        const cat = categories[t.category] || categories.Shopping;
+        // Използваме category_name ако го има от бекенда, или го третираме като string/fallback
+        const categoryName = t.category_name || "Shopping";
+        const cat = categories[categoryName] || categories.Shopping;
+
         return (
           <div className="transaction-row" key={t.id}>
             <div className="transaction-name">
@@ -39,18 +41,18 @@ export const TransactionRows: React.FC<TransactionRowsProps> = ({ rows, compact 
                 {cat.icon}
               </span>
               <div>
-                <strong>{t.name}</strong>
+                <strong>{t.description || "Untitled transaction"}</strong>
                 <small>{t.type}</small>
               </div>
             </div>
             <span>
               <b className="category-badge" style={{ color: cat.color, background: cat.bg }}>
-                {t.category}
+                {categoryName}
               </b>
             </span>
             <span className="date">{t.date}</span>
-            <strong className={t.amount > 0 ? "income" : "expense"}>
-              {t.amount > 0 ? "+" : "-"}$
+            <strong className={t.type === "INCOME" ? "income" : "expense"}>
+              {t.type === "INCOME" ? "+" : "-"}$
               {Math.abs(t.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </strong>
             {!compact && (
