@@ -1,7 +1,8 @@
-import React, { type FormEvent } from "react";
+import React, { useState } from "react";
 import { Button, Logo } from "../components/UI";
 import { Icon } from "../components/Icon";
 import { AuthBrandArt } from "../components/AuthBrandArt";
+import { useRegisterMutation } from "../services/authApi";
 
 interface RegisterViewProps {
   onAuthenticate: () => void;
@@ -9,9 +10,27 @@ interface RegisterViewProps {
 }
 
 export const RegisterView: React.FC<RegisterViewProps> = ({ onAuthenticate, onSwitchToLogin }) => {
-  const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
+
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  
+  const [register, { isLoading, error }] = useRegisterMutation();
+
+  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
-    onAuthenticate();
+    try {
+      
+      await register({ username, password }).unwrap();
+
+     
+      alert("Registration successful! Please sign in.");
+      onSwitchToLogin();
+    } catch (err) {
+      console.error("Registration error:", err);
+    }
   };
 
   return (
@@ -26,14 +45,32 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onAuthenticate, onSw
           <h1>Create your account</h1>
           <p className="auth-sub">Join thousands taking control of their finances.</p>
 
+          {/* Error message for failed registration */}
+          {error && (
+            <div style={{ color: "red", fontSize: "0.875rem", marginBottom: "1rem" }}>
+              Registration failed. Username might already be taken.
+            </div>
+          )}
+
           <div className="field">
-            <label>Full name</label>
-            <input required placeholder="Alex Morgan" />
+            <label>Username (Full name / Nickname)</label>
+            <input 
+              required 
+              placeholder="Alex Morgan" 
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
           </div>
 
           <div className="field">
             <label>Email address</label>
-            <input type="email" required placeholder="alex@example.com" />
+            <input 
+              type="email" 
+              required 
+              placeholder="alex@example.com" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
           </div>
 
           <div className="field">
@@ -41,8 +78,21 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onAuthenticate, onSw
               <label>Password</label>
             </div>
             <div className="input-icon">
-              <input type="password" required minLength={8} placeholder="At least 8 characters" />
-              <Icon name="eye" size={18} />
+              <input 
+                type={showPassword ? "text" : "password"} 
+                required 
+                minLength={8} 
+                placeholder="At least 8 characters" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <button 
+                type="button" 
+                onClick={() => setShowPassword(!showPassword)}
+                style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
+              >
+                <Icon name="eye" size={18} />
+              </button>
             </div>
           </div>
 
@@ -53,7 +103,9 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onAuthenticate, onSw
             </span>
           </label>
 
-          <Button type="submit">Create account</Button>
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? "Creating account..." : "Create account"}
+          </Button>
 
           <div className="divider">
             <span>or continue with</span>
