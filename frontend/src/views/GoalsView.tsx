@@ -1,111 +1,113 @@
 import React, { useState } from 'react';
 import { Button } from '../components/UI';
 import { Icon } from '../components/Icon';
-import type { IconName } from '../types/icons';
-
-const initialGoals = [
-  {
-    id: 1,
-    name: "Dream home",
-    icon: "wallet" as IconName,
-    current: 18500,
-    target: 40000,
-    deadline: "December 2026",
-    color: "#526DE2",
-    bg: "#EDF0FF",
-  },
-  {
-    id: 2,
-    name: "Japan adventure",
-    icon: "target" as IconName,
-    current: 4850,
-    target: 7500,
-    deadline: "April 2026",
-    color: "#9874DE",
-    bg: "#F3EEFF",
-  },
-  {
-    id: 3,
-    name: "Emergency fund",
-    icon: "plus" as IconName,
-    current: 9200,
-    target: 12000,
-    deadline: "September 2025",
-    color: "#299D70",
-    bg: "#E8F7F1",
-  },
-  {
-    id: 4,
-    name: "New car",
-    icon: "grid" as IconName,
-    current: 6300,
-    target: 25000,
-    deadline: "June 2027",
-    color: "#E58A4B",
-    bg: "#FFF2E8",
-  },
-];
+import { 
+  useGetSavingGoalsQuery, 
+  useUpdateSavingGoalMutation 
+} from '../services/savingGoalsApi';
+import { SavingGoalModal } from '../components/SavingGoalModal';
+import type { SavingGoal } from '../types/saving-goal';
 
 export const GoalsView: React.FC = () => {
-  const [goals, setGoals] = useState(initialGoals);
+  const { data: goals = [], isLoading, error, refetch } = useGetSavingGoalsQuery();
+  const [updateSavingGoal] = useUpdateSavingGoalMutation();
+  
   const [depositId, setDepositId] = useState<number | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedGoal, setSelectedGoal] = useState<SavingGoal | null>(null);
 
-  const deposit = (id: number) => {
-    setGoals(
-      goals.map((g) => (g.id === id ? { ...g, current: Math.min(g.target, g.current + 500) } : g)),
-    );
-    setDepositId(null);
+  const handleDeposit = async (goal: SavingGoal) => {
+    const current = Number(goal.current_amount);
+    const target = Number(goal.target_amount);
+    const newCurrent = current + 500;
+    
+    try {
+      await updateSavingGoal({
+        id: goal.id,
+        data: {
+          ...goal,
+          current_amount: newCurrent > target ? target : newCurrent,
+        },
+      }).unwrap();
+      setDepositId(null);
+    } catch (err) {
+      console.error("Failed to deposit funds:", err);
+    }
   };
+
+  const handleOpenAddModal = () => {
+    setSelectedGoal(null);
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (goal: SavingGoal) => {
+    setSelectedGoal(goal);
+    setIsModalOpen(true);
+  };
+
+  if (isLoading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading saving goals...</div>;
+  if (error) return <div style={{ padding: '2rem', textAlign: 'center', color: 'red' }}>Error loading saving goals.</div>;
+
+  const totalSaved = goals.reduce((a, g) => a + Number(g.current_amount || 0), 0);
 
   return (
     <>
       <div className="section-actions">
         <div className="goals-total">
           <span>Total saved across goals</span>
-          <strong>${goals.reduce((a, g) => a + g.current, 0).toLocaleString()}</strong>
+          <strong>${totalSaved.toLocaleString()}</strong>
         </div>
-        <Button icon="plus">New saving goal</Button>
+        <Button icon="plus" onClick={handleOpenAddModal}>New saving goal</Button>
       </div>
+
       <section className="goals-grid">
-        {goals.map((g) => {
-          const percent = Math.round((g.current / g.target) * 100);
+        {goals.map((g: SavingGoal) => {
+          const current = Number(g.current_amount || 0);
+          const target = Number(g.target_amount || 1);
+          const percent = Math.round((current / target) * 100);
+          
+          // Fallback стилове и иконки
+          const color = "#526DE2";
+          const bg = "#EDF0FF";
+          const iconName = "wallet";
+
           return (
             <article className="card goal-card" key={g.id}>
               <div className="goal-top">
-                <span className="goal-icon" style={{ color: g.color, background: g.bg }}>
-                  <Icon name={g.icon} size={19} />
+                <span className="goal-icon" style={{ color, background: bg }}>
+                  <Icon name={iconName} size={19} />
                 </span>
-                <button type="button">
+                <button type="button" onClick={() => handleOpenEditModal(g)}>
                   <Icon name="dots" />
                 </button>
               </div>
               <h3>{g.name}</h3>
               <p>
-                <Icon name="calendar" size={14} /> Goal date: {g.deadline}
+                <Icon name="calendar" size={14} /> Goal date: {g.deadline || "No deadline"}
               </p>
               <div className="goal-money">
-                <strong>${g.current.toLocaleString()}</strong>
-                <span>of ${g.target.toLocaleString()}</span>
+                <strong>${current.toLocaleString()}</strong>
+                <span>of ${target.toLocaleString()}</span>
               </div>
               <div className="progress">
-                <span style={{ width: `${Math.min(percent, 100)}%`, background: g.color }} />
+                <span style={{ width: `${Math.min(percent, 100)}%`, background: color }} />
               </div>
               <div className="goal-percent">
                 <span>{percent}% complete</span>
-                <strong>${(g.target - g.current).toLocaleString()} to go</strong>
+                <strong>${(target - current).toLocaleString()} to go</strong>
               </div>
               {depositId === g.id ? (
                 <div className="deposit-confirm">
                   <span>Add $500 to this goal?</span>
                   <div>
                     <button onClick={() => setDepositId(null)} type="button">Cancel</button>
-                    <button onClick={() => deposit(g.id)} type="button">Confirm</button>
+                    <button onClick={() => handleDeposit(g)} type="button">Confirm</button>
                   </div>
                 </div>
               ) : (
                 <button
                   className="deposit-btn"
-                  style={{ color: g.color, borderColor: `${g.color}40`, background: g.bg }}
+                  style={{ color, borderColor: `${color}40`, background: bg }}
                   onClick={() => setDepositId(g.id)}
                   type="button"
                 >
@@ -116,7 +118,8 @@ export const GoalsView: React.FC = () => {
             </article>
           );
         })}
-        <button className="new-goal-card" type="button">
+
+        <button className="new-goal-card" type="button" onClick={handleOpenAddModal}>
           <span>
             <Icon name="plus" />
           </span>
@@ -124,6 +127,15 @@ export const GoalsView: React.FC = () => {
           <p>Start saving for what matters next.</p>
         </button>
       </section>
+
+      {/* Модал за създаване/редакция на спестовна цел */}
+      {isModalOpen && (
+        <SavingGoalModal
+          goal={selectedGoal}
+          onClose={() => setIsModalOpen(false)}
+          onSave={() => refetch()}
+        />
+      )}
     </>
   );
 };

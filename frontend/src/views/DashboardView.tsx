@@ -3,15 +3,17 @@ import { StatCard } from '../components/StatCard';
 import { TransactionRows } from '../components/TransactionRows';
 import { Button } from '../components/UI';
 import { Icon } from '../components/Icon';
-import type { Transaction } from '../types/transaction';
+import { useGetTransactionsQuery } from '../services/transactionsApi';
 
 interface DashboardViewProps {
   setPage: (p: string) => void;
   onAdd: () => void;
-  transactions: Transaction[];
 }
 
-export const DashboardView: React.FC<DashboardViewProps> = ({ setPage, onAdd, transactions }) => {
+export const DashboardView: React.FC<DashboardViewProps> = ({ setPage, onAdd }) => {
+  
+  const { data: transactions = [], isLoading } = useGetTransactionsQuery();
+
   return (
     <>
       <div className="quick-actions">
@@ -136,7 +138,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage, onAdd, tr
             View all <Icon name="chevron" size={15} />
           </button>
         </div>
-        <TransactionRows rows={transactions.slice(0, 5)} compact />
+        {isLoading ? (
+          <p style={{ padding: '1rem', color: '#666' }}>Loading recent transactions...</p>
+        ) : (
+          <TransactionRows rows={transactions.slice(0, 5)} compact />
+        )}
       </section>
     </>
   );

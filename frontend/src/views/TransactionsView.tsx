@@ -3,6 +3,7 @@ import { Button } from '../components/UI';
 import { Icon } from '../components/Icon';
 import { TransactionRows } from '../components/TransactionRows';
 import type { Transaction } from '../types/transaction';
+import { useGetTransactionsQuery } from '../services/transactionsApi';
 
 const categories: Record<string, { color: string; bg: string; icon: string }> = {
   Salary: { color: "#2A9D70", bg: "#E8F7F1", icon: "S" },
@@ -16,25 +17,32 @@ const categories: Record<string, { color: string; bg: string; icon: string }> = 
 };
 
 interface TransactionsViewProps {
-  rows: Transaction[];
   openModal: (t?: Transaction) => void;
 }
 
-export const TransactionsView: React.FC<TransactionsViewProps> = ({ rows, openModal }) => {
+export const TransactionsView: React.FC<TransactionsViewProps> = ({ openModal }) => {
+  // Извличаме реалните транзакции от бекенда
+  const { data: rows = [], isLoading, error } = useGetTransactionsQuery();
+
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All categories");
   const [type, setType] = useState("All types");
 
   const filtered = useMemo(
     () =>
-      rows.filter(
-        (t) =>
-          t.name.toLowerCase().includes(query.toLowerCase()) &&
-          (category === "All categories" || t.category === category) &&
-          (type === "All types" || t.type === type),
-      ),
+      rows.filter((t) => {
+        const matchesQuery = (t.description || "").toLowerCase().includes(query.toLowerCase());
+        const matchesCategory = category === "All categories" || t.category_name === category;
+        // На бекенда type е 'INCOME' или 'EXPENSE', а филтърът може да е 'Income' или 'Expense'
+        const matchesType = type === "All types" || t.type.toUpperCase() === type.toUpperCase();
+        
+        return matchesQuery && matchesCategory && matchesType;
+      }),
     [rows, query, category, type],
   );
+
+  if (isLoading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading transactions...</div>;
+  if (error) return <div style={{ padding: '2rem', textAlign: 'center', color: 'red' }}>Error loading transactions.</div>;
 
   return (
     <>
@@ -71,8 +79,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ rows, openMo
           </select>
           <select value={type} onChange={(e) => setType(e.target.value)}>
             <option>All types</option>
-            <option>Income</option>
-            <option>Expense</option>
+            <option value="INCOME">Income</option>
+            <option value="EXPENSE">Expense</option>
           </select>
           <button className="date-filter" type="button">
             <Icon name="calendar" size={17} />
@@ -81,7 +89,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ rows, openMo
         </div>
         <div className="table-summary">
           <p>
-            <strong>{filtered.length} transactions</strong> in May 2025
+            <strong>{filtered.length} transactions</strong> found
           </p>
           <button
             type="button"

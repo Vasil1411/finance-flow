@@ -1,17 +1,14 @@
 import React, { useState } from 'react';
 import { Button } from '../components/UI';
 import { Icon } from '../components/Icon';
+import { useGetCategoriesQuery } from '../services/categoriesApi';
+import { useGetBudgetsQuery } from '../services/budgetsApi';
+import { CategoryModal } from '../components/CategoryModal';
+import { BudgetModal } from '../components/BudgetModal';
+import type { Category } from '../types/transaction';
+import type { Budget } from '../types/budget';
 
-const budgets = [
-  { name: "Housing", type: "Needs", spent: 1450, budget: 1600, color: "#5B8DEF" },
-  { name: "Groceries", type: "Needs", spent: 486, budget: 600, color: "#5B8DEF" },
-  { name: "Transport", type: "Needs", spent: 318, budget: 400, color: "#5B8DEF" },
-  { name: "Entertainment", type: "Wants", spent: 285, budget: 300, color: "#9874DE" },
-  { name: "Shopping", type: "Wants", spent: 375, budget: 350, color: "#E27A54" },
-  { name: "Emergency fund", type: "Savings", spent: 680, budget: 800, color: "#2EA879" },
-];
-
-const categories: Record<string, { color: string; bg: string; icon: string }> = {
+const categoriesConfig: Record<string, { color: string; bg: string; icon: string }> = {
   Housing: { color: "#6681D9", bg: "#ECF0FF", icon: "H" },
   Groceries: { color: "#E17A4A", bg: "#FFF1E9", icon: "G" },
   Transport: { color: "#8A6FD1", bg: "#F2EDFF", icon: "T" },
@@ -22,7 +19,28 @@ const categories: Record<string, { color: string; bg: string; icon: string }> = 
 
 export const BudgetsView: React.FC = () => {
   const [active, setActive] = useState("All");
-  const visible = active === "All" ? budgets : budgets.filter((b) => b.type === active);
+  
+  // Състояния за модалите
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+
+  // Извличаме категориите и бюджетите едновременно от бекенда
+  const { data: categories = [], isLoading: loadingCategories, refetch: refetchCategories } = useGetCategoriesQuery();
+  const { data: budgets = [], isLoading: loadingBudgets, refetch: refetchBudgets } = useGetBudgetsQuery();
+
+  // Филтриране на категориите спрямо активния таб (All, Needs, Wants, Savings)
+  const visibleCategories = active === "All" 
+    ? categories 
+    : categories.filter((c: Category) => c.allocation_type?.toUpperCase() === active.toUpperCase());
+
+  // Изчисляване на общия бюджет и суми спрямо реалните данни
+  const totalBudgetLimit = budgets.reduce((acc, b) => acc + Number(b.amount || 0), 0);
+  const totalSpent = 4050; // Тук може да се замени със сумата от реалните транзакции по категории
+
+  if (loadingCategories || loadingBudgets) {
+    return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading budgets & categories...</div>;
+  }
 
   return (
     <>
@@ -36,26 +54,34 @@ export const BudgetsView: React.FC = () => {
             <Icon name="chevron" size={16} />
           </button>
         </div>
-        <Button icon="plus">Create budget</Button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <Button variant="secondary" onClick={() => setIsCategoryModalOpen(true)}>
+            + New Category
+          </Button>
+          <Button icon="plus" onClick={() => { setSelectedCategory(null); setIsBudgetModalOpen(true); }}>
+            Create budget
+          </Button>
+        </div>
       </div>
+
       <section className="budget-summary-grid">
         <div className="card overall-budget">
           <div className="card-heading">
             <div>
               <span className="eyebrow">TOTAL MONTHLY BUDGET</span>
               <h2>
-                $4,050 <small>of $4,600</small>
+                ${totalSpent.toLocaleString()} <small>of ${totalBudgetLimit.toLocaleString()}</small>
               </h2>
             </div>
             <div className="budget-ring">
-              <span>88%</span>
+              <span>{totalBudgetLimit > 0 ? Math.round((totalSpent / totalBudgetLimit) * 100) : 0}%</span>
             </div>
           </div>
           <div className="progress">
-            <span style={{ width: "88%", background: "#516CE5" }} />
+            <span style={{ width: `${Math.min(totalBudgetLimit > 0 ? (totalSpent / totalBudgetLimit) * 100 : 0, 100)}%`, background: "#516CE5" }} />
           </div>
           <div className="overall-labels">
-            <span>$550 remaining</span>
+            <span>${Math.abs(totalBudgetLimit - totalSpent)} remaining</span>
             <span>9 days left</span>
           </div>
         </div>
@@ -77,6 +103,7 @@ export const BudgetsView: React.FC = () => {
           </div>
         </div>
       </section>
+
       <div className="tabs">
         {["All", "Needs", "Wants", "Savings"].map((t) => (
           <button key={t} className={active === t ? "active" : ""} onClick={() => setActive(t)} type="button">
@@ -84,41 +111,65 @@ export const BudgetsView: React.FC = () => {
           </button>
         ))}
       </div>
+
       <section className="budget-cards">
-        {visible.map((b) => {
-          const percent = Math.round((b.spent / b.budget) * 100);
-          const cat = categories[b.name] || categories.Housing;
+        {visibleCategories.map((cat: Category) => {
+          // Намираме съответния бюджет за тази категория (ако има зададен)
+          const matchedBudget = budgets.find((b: Budget) => b.category === cat.id);
+          const budgetLimit = matchedBudget ? Number(matchedBudget.amount) : 500; // дефолтен лимит ако няма бюджет
+          const spent = 350; // реално оразходвана сума
+          const percent = budgetLimit > 0 ? Math.round((spent / budgetLimit) * 100) : 0;
+          
+          const catStyle = categoriesConfig[cat.name] || categoriesConfig.Shopping;
+          const typeLabel = cat.allocation_type || "NEED";
+
           return (
-            <article className="card budget-card" key={b.name}>
+            <article className="card budget-card" key={cat.id}>
               <div className="budget-card-top">
-                <span className="category-icon" style={{ color: cat.color, background: cat.bg }}>
-                  {cat.icon}
+                <span className="category-icon" style={{ color: catStyle.color, background: catStyle.bg }}>
+                  {catStyle.icon}
                 </span>
-                <span className={`type-badge ${b.type.toLowerCase()}`}>{b.type}</span>
-                <button type="button">
+                <span className={`type-badge ${typeLabel.toLowerCase()}`}>{typeLabel}</span>
+                <button type="button" onClick={() => { setSelectedCategory(cat); setIsCategoryModalOpen(true); }}>
                   <Icon name="dots" />
                 </button>
               </div>
-              <h3>{b.name}</h3>
+              <h3>{cat.name}</h3>
               <div className="budget-value">
-                <strong>${b.spent.toLocaleString()}</strong>
-                <span>of ${b.budget.toLocaleString()}</span>
+                <strong>${spent.toLocaleString()}</strong>
+                <span>of ${budgetLimit.toLocaleString()}</span>
               </div>
               <div className="progress">
-                <span style={{ width: `${Math.min(percent, 100)}%`, background: percent > 100 ? "#E06A4E" : b.color }} />
+                <span style={{ width: `${Math.min(percent, 100)}%`, background: percent > 100 ? "#E06A4E" : catStyle.color }} />
               </div>
               <div className="budget-status">
                 <span style={{ color: percent > 100 ? "#D95E44" : "#667085" }}>
                   {percent}% used
                 </span>
                 <strong>
-                  {percent > 100 ? `$${b.spent - b.budget} over` : `$${b.budget - b.spent} left`}
+                  {percent > 100 ? `$${spent - budgetLimit} over` : `$${budgetLimit - spent} left`}
                 </strong>
               </div>
             </article>
           );
         })}
       </section>
+
+      {/* Модали за категории и бюджети */}
+      {isCategoryModalOpen && (
+        <CategoryModal
+          category={selectedCategory}
+          onClose={() => setIsCategoryModalOpen(false)}
+          onSave={() => refetchCategories()}
+        />
+      )}
+
+      {isBudgetModalOpen && (
+        <BudgetModal
+          onClose={() => setIsBudgetModalOpen(false)}
+          onSave={() => refetchBudgets()}
+        />
+      )}
     </>
   );
 };
