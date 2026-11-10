@@ -1,7 +1,6 @@
-export type TransactionType = 'Income' | 'Expense';
+export type TransactionType = 'INCOME' | 'EXPENSE';
 
 export type RuleChoice = 'NEED' | 'WANT' | 'SAVINGS' | 'NONE';
-
 
 export interface Category {
   id: number;
@@ -12,8 +11,8 @@ export interface Category {
 
 export interface Transaction {
   id: number;
-  category: number; // ID of the category
-  category_name?: string; //  (read-only)
+  category: number | null; 
+  category_name?: string; 
   amount: number;
   type: TransactionType;
   date: string; // YYYY-MM-DD

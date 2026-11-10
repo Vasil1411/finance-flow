@@ -10,3 +10,8 @@ export interface AuthCredentials {
   email?: string;
   password: string;
 }
+
+export type AuthResponse = {
+  access: string;
+  refresh: string;
+}
