@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Icon } from './Icon';
 import { Button } from './UI';
 import type { Category, TransactionType, RuleChoice } from '../types/transaction';
@@ -11,20 +11,32 @@ interface CategoryModalProps {
 }
 
 export const CategoryModal: React.FC<CategoryModalProps> = ({ category, onClose, onSave }) => {
+  const [name, setName] = useState(category?.name || "");
   const [type, setType] = useState<TransactionType>(category?.type || "EXPENSE");
   const [allocationType, setAllocationType] = useState<RuleChoice>(category?.allocation_type || "NEED");
+
+  useEffect(() => {
+    if (category) {
+      setName(category.name || "");
+      setType(category.type || "EXPENSE");
+      setAllocationType(category.allocation_type || "NEED");
+    } else {
+      setName("");
+      setType("EXPENSE");
+      setAllocationType("NEED");
+    }
+  }, [category]);
 
   const [addCategory, { isLoading: isAdding }] = useAddCategoryMutation();
   const [updateCategory, { isLoading: isUpdating }] = useUpdateCategoryMutation();
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
 
     const payload = {
-      name: String(formData.get("name")),
-      type: type, // 'INCOME' или 'EXPENSE'
-      allocation_type: allocationType, // 'NEED', 'WANT', 'SAVINGS', 'NONE'
+      name: name,
+      type: type,
+      allocation_type: allocationType,
     };
 
     try {
@@ -36,7 +48,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({ category, onClose,
       onSave();
       onClose();
     } catch (err) {
-      console.error("Failed to save category/budget:", err);
+      console.error("Failed to save category:", err);
     }
   };
 
@@ -54,7 +66,6 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({ category, onClose,
           </button>
         </div>
 
-        {/* choice of type: Expense / Income */}
         <div className="type-toggle">
           <button
             type="button"
@@ -73,18 +84,17 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({ category, onClose,
             Income
           </button>
         </div>
-
         
         <div className="field">
           <label>Category Name</label>
           <input
             name="name"
             required
-            defaultValue={category?.name || ""}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Groceries, Rent, Freelance..."
           />
         </div>
-
         
         <div className="field">
           <label>50/30/20 Budget Rule Allocation</label>
@@ -92,6 +102,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({ category, onClose,
             value={allocationType} 
             onChange={(e) => setAllocationType(e.target.value as RuleChoice)}
           >
+            {/* Стойностите тук съвпадат на 100% с бекенд модела (NEED, WANT, SAVINGS, NONE) */}
             <option value="NEED">Needs (50%)</option>
             <option value="WANT">Wants (30%)</option>
             <option value="SAVINGS">Savings (20%)</option>

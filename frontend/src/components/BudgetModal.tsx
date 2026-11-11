@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Icon } from './Icon';
 import { Button } from './UI';
 import type { Budget } from '../types/budget';
@@ -12,11 +12,12 @@ interface BudgetModalProps {
 }
 
 export const BudgetModal: React.FC<BudgetModalProps> = ({ budget, onClose, onSave }) => {
-  // Извличаме категориите, за да може потребителят да избере за коя категория е бюджетът
   const { data: categories = [] } = useGetCategoriesQuery();
   
-  // Филтрираме само категориите от тип 'EXPENSE', тъй като бекендът разрешава бюджет само за тях
-  const expenseCategories = categories.filter((c: any) => c.type === 'EXPENSE');
+  // Показваме само категории от тип EXPENSE (никакви приходи!)
+  const expenseCategories = categories.filter((c: any) => 
+    c.type && c.type.toUpperCase() === 'EXPENSE'
+  );
 
   const [addBudget, { isLoading: isAdding }] = useAddBudgetMutation();
   const [updateBudget, { isLoading: isUpdating }] = useUpdateBudgetMutation();
@@ -26,8 +27,7 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({ budget, onClose, onSav
     const formData = new FormData(e.currentTarget);
     const amount = Number(formData.get("amount"));
 
-    // Бекендът очаква месец във формат YYYY-MM-DD (например първия ден от месеца: 2025-05-01)
-    const rawMonth = String(formData.get("month")); // формат от input type="month" е YYYY-MM
+    const rawMonth = String(formData.get("month")); // формат YYYY-MM
     const monthFormatted = rawMonth.length === 7 ? `${rawMonth}-01` : rawMonth;
 
     const payload = {
@@ -49,7 +49,6 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({ budget, onClose, onSav
     }
   };
 
-  // Подготовка на дефолтния месец за input-а (YYYY-MM)
   const defaultMonth = budget?.month ? budget.month.slice(0, 7) : new Date().toISOString().slice(0, 7);
 
   return (
@@ -66,20 +65,18 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({ budget, onClose, onSav
           </button>
         </div>
 
-        {/* Избор на категория */}
         <div className="field">
           <label>Expense Category</label>
           <select name="category" defaultValue={budget?.category || ""} required>
-            <option value="" disabled>Select category...</option>
+            <option value="" disabled>Select expense category...</option>
             {expenseCategories.map((cat: any) => (
               <option key={cat.id} value={cat.id}>
-                {cat.name}
+                {cat.name} ({cat.allocation_type || 'NEED'})
               </option>
             ))}
           </select>
         </div>
 
-        {/* Сума на бюджета */}
         <div className="field amount-field">
           <label>Budget Amount</label>
           <div>
@@ -96,7 +93,6 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({ budget, onClose, onSav
           </div>
         </div>
 
-        {/* Избор на месец */}
         <div className="field">
           <label>Month</label>
           <input

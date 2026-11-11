@@ -3,6 +3,7 @@ import { Icon } from './Icon';
 import { Button } from './UI';
 import type { Transaction, TransactionType } from '../types/transaction';
 import { useAddTransactionMutation, useUpdateTransactionMutation } from '../services/transactionsApi';
+import { useGetCategoriesQuery } from '../services/categoriesApi';
 
 interface TransactionModalProps {
   transaction?: Transaction | null;
@@ -10,11 +11,16 @@ interface TransactionModalProps {
   onSave: () => void;
 }
 
-const categoriesKeys = ["Salary", "Groceries", "Housing", "Transport", "Shopping", "Freelance", "Entertainment", "Utilities"];
-
 export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction, onClose, onSave }) => {
-  // На бекенда type е 'INCOME' или 'EXPENSE'
   const [type, setType] = useState<TransactionType>(transaction?.type || "EXPENSE");
+
+  // Извличаме реалните категории от бекенда
+  const { data: categories = [] } = useGetCategoriesQuery();
+
+  // Филтрираме категориите спрямо избрания тип (Expense или Income), за да са коректни
+  const filteredCategories = categories.filter((c: any) => 
+    !c.type || c.type.toUpperCase() === type.toUpperCase()
+  );
 
   const [addTransaction, { isLoading: isAdding }] = useAddTransactionMutation();
   const [updateTransaction, { isLoading: isUpdating }] = useUpdateTransactionMutation();
@@ -25,10 +31,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction,
     const amount = Number(formData.get("amount"));
     const categoryVal = formData.get("category");
 
-    // Подготовка на данните с правилно конвертирани типове
-   const payload = {
+    const payload = {
       amount: amount, 
-      type: type, // 'INCOME' или 'EXPENSE'
+      type: type, 
       date: String(formData.get("date")),
       description: String(formData.get("description")),
       category: categoryVal ? Number(categoryVal) : null,
@@ -60,6 +65,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction,
             <Icon name="close" />
           </button>
         </div>
+        
         <div className="type-toggle">
           <button
             type="button"
@@ -78,6 +84,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction,
             Income
           </button>
         </div>
+
         <div className="field amount-field">
           <label>Amount</label>
           <div>
@@ -93,12 +100,16 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction,
             />
           </div>
         </div>
+
         <div className="form-row">
           <div className="field">
             <label>Category</label>
-            <select name="category" defaultValue={transaction?.category_name || "Groceries"}>
-              {categoriesKeys.map((c) => (
-                <option key={c} value={c}>{c}</option>
+            <select name="category" defaultValue={transaction?.category || ""} required>
+              <option value="" disabled>Select category...</option>
+              {filteredCategories.map((c: any) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
               ))}
             </select>
           </div>
@@ -112,6 +123,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction,
             />
           </div>
         </div>
+
         <div className="field">
           <label>Description</label>
           <input
@@ -121,6 +133,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction,
             placeholder="What was this transaction for?"
           />
         </div>
+
         <div className="modal-actions">
           <Button variant="secondary" onClick={onClose} type="button">
             Cancel

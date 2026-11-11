@@ -1,5 +1,5 @@
 import React, { type ReactNode, useState } from 'react';
-import { Logo, Button } from './UI';
+import { Logo } from './UI';
 import { Icon } from './Icon';
 import type { IconName } from '../types/icons';
 
@@ -19,8 +19,13 @@ interface ShellProps {
 
 export const Shell: React.FC<ShellProps> = ({ page, setPage, onLogout, children }) => {
   const [mobileMenu, setMobileMenu] = useState(false);
+
+  // Извличаме само потребителското име и инициалите от localStorage
+  const username = localStorage.getItem("username") || "User";
+  const initials = username.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) || "U";
+
   const names: Record<string, [string, string]> = {
-    dashboard: ["Good morning, Alex", "Here's how your money is doing this month."],
+    dashboard: [`Good morning, ${username}`, "Here's how your money is doing this month."],
     transactions: ["Transactions", "View and manage all your income and expenses."],
     budgets: ["Budgets & categories", "Stay on track with your monthly spending plan."],
     goals: ["Saving goals", "Turn your plans into progress, one deposit at a time."],
@@ -66,10 +71,10 @@ export const Shell: React.FC<ShellProps> = ({ page, setPage, onLogout, children 
             <p>Review your subscriptions monthly to keep expenses lean.</p>
           </div>
           <div className="profile">
-            <div className="avatar">AM</div>
+            <div className="avatar">{initials}</div>
             <div>
-              <strong>Alex Morgan</strong>
-              <span>alex@example.com</span>
+              <strong>{username}</strong>
+              {/* Имейлът е премахнат напълно от тук */}
             </div>
             <button onClick={onLogout} title="Sign out" type="button">
               <Icon name="logout" size={17} />
@@ -91,7 +96,7 @@ export const Shell: React.FC<ShellProps> = ({ page, setPage, onLogout, children 
             <Icon name="menu" />
           </button>
           <div className="page-title">
-            <h1>{names[page]?.[0] || "Dashboard"}</h1>
+            <h1>{names[page]?.[0] || `Good morning, ${username}`}</h1>
             <p>{names[page]?.[1] || ""}</p>
           </div>
           <div className="top-actions">
@@ -102,7 +107,7 @@ export const Shell: React.FC<ShellProps> = ({ page, setPage, onLogout, children 
               <Icon name="bell" />
               <i />
             </button>
-            <div className="avatar">AM</div>
+            <div className="avatar">{initials}</div>
           </div>
         </header>
         <main className="page-content">{children}</main>
