@@ -13,13 +13,15 @@ export const GoalsView: React.FC = () => {
   const [updateSavingGoal] = useUpdateSavingGoalMutation();
   
   const [depositId, setDepositId] = useState<number | null>(null);
+  const [depositAmount, setDepositAmount] = useState<string>("100");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<SavingGoal | null>(null);
 
   const handleDeposit = async (goal: SavingGoal) => {
     const current = Number(goal.current_amount);
     const target = Number(goal.target_amount);
-    const newCurrent = current + 500;
+    const addValue = Number(depositAmount) || 0;
+    const newCurrent = current + addValue;
     
     try {
       await updateSavingGoal({
@@ -30,6 +32,7 @@ export const GoalsView: React.FC = () => {
         },
       }).unwrap();
       setDepositId(null);
+      setDepositAmount("100");
     } catch (err) {
       console.error("Failed to deposit funds:", err);
     }
@@ -66,7 +69,6 @@ export const GoalsView: React.FC = () => {
           const target = Number(g.target_amount || 1);
           const percent = Math.round((current / target) * 100);
           
-          // Fallback стилове и иконки
           const color = "#526DE2";
           const bg = "#EDF0FF";
           const iconName = "wallet";
@@ -96,19 +98,29 @@ export const GoalsView: React.FC = () => {
                 <span>{percent}% complete</span>
                 <strong>${(target - current).toLocaleString()} to go</strong>
               </div>
+
               {depositId === g.id ? (
-                <div className="deposit-confirm">
-                  <span>Add $500 to this goal?</span>
-                  <div>
-                    <button onClick={() => setDepositId(null)} type="button">Cancel</button>
-                    <button onClick={() => handleDeposit(g)} type="button">Confirm</button>
+                <div className="deposit-confirm" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+                  <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Enter amount to deposit ($):</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1"
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                    autoFocus
+                    style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #ccc', width: '100%' }}
+                  />
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <button onClick={() => setDepositId(null)} type="button" style={{ padding: '6px 12px', background: '#f1f1f1', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Cancel</button>
+                    <button onClick={() => handleDeposit(g)} type="button" style={{ padding: '6px 12px', background: '#526DE2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Confirm</button>
                   </div>
                 </div>
               ) : (
                 <button
                   className="deposit-btn"
                   style={{ color, borderColor: `${color}40`, background: bg }}
-                  onClick={() => setDepositId(g.id)}
+                  onClick={() => { setDepositId(g.id); setDepositAmount("100"); }}
                   type="button"
                 >
                   <Icon name="plus" size={16} />
@@ -118,17 +130,8 @@ export const GoalsView: React.FC = () => {
             </article>
           );
         })}
-
-        <button className="new-goal-card" type="button" onClick={handleOpenAddModal}>
-          <span>
-            <Icon name="plus" />
-          </span>
-          <strong>Create a new goal</strong>
-          <p>Start saving for what matters next.</p>
-        </button>
       </section>
 
-      {/* Модал за създаване/редакция на спестовна цел */}
       {isModalOpen && (
         <SavingGoalModal
           goal={selectedGoal}

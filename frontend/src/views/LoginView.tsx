@@ -10,28 +10,26 @@ interface LoginViewProps {
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticate, onSwitchToRegister }) => {
-  
   const [username, setUsername] = useState(""); 
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-
 
   const [login, { isLoading, error }] = useLoginMutation();
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
-      
       const response = await login({ username, password }).unwrap();
 
-      
       localStorage.setItem("access_token", response.access);
       localStorage.setItem("refresh_token", response.refresh);
-
+      localStorage.setItem("username", username); 
       
+
       onAuthenticate();
     } catch (err) {
       console.error("Login Error:", err);
+      setPassword("");
     }
   };
 
@@ -39,7 +37,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticate, onSwitchTo
     <div className="auth-page">
       <AuthBrandArt />
       <main className="auth-form-wrap">
-        <form className="auth-form" onSubmit={handleSubmit}>
+        <form className="auth-form" onSubmit={handleSubmit} autoComplete="off">
           <div className="mobile-auth-logo">
             <Logo />
           </div>
@@ -47,7 +45,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticate, onSwitchTo
           <h1>Good to see you again</h1>
           <p className="auth-sub">Enter your details to access your financial dashboard.</p>
           
-          {/* Error message for invalid credentials */}
           {error && (
             <div style={{ color: "red", fontSize: "0.875rem", marginBottom: "1rem" }}>
               Invalid username or password. Please try again.
@@ -55,13 +52,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticate, onSwitchTo
           )}
 
           <div className="field">
-            <label>Username / Email</label>
+            <label>Username</label>
             <input 
               type="text" 
               required 
-              placeholder="alex@example.com" 
+              placeholder="Enter your username" 
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              autoComplete="off"
             />
           </div>
 
@@ -70,28 +68,37 @@ export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticate, onSwitchTo
               <label>Password</label>
               <button type="button">Forgot password?</button>
             </div>
-            <div className="input-icon">
+            <div className="input-icon" style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <input 
                 type={showPassword ? "text" : "password"} 
                 required 
                 placeholder="Enter your password" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                style={{ width: '100%', paddingRight: '40px' }}
+                autoComplete="current-password"
               />
               <button 
                 type="button" 
                 onClick={() => setShowPassword(!showPassword)}
-                style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                style={{ 
+                  position: 'absolute', 
+                  right: '14px', 
+                  background: 'transparent', 
+                  border: 'none', 
+                  cursor: 'pointer', 
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '4px',
+                  color: '#667085',
+                  zIndex: 2
+                }}
               >
-                <Icon name="eye" size={18} />
+                <Icon name={showPassword ? "eye" : "eye"} size={18} />
               </button>
             </div>
           </div>
-
-          <label className="checkbox">
-            <input type="checkbox" />
-            <span>Remember me for 30 days</span>
-          </label>
 
           <Button type="submit" disabled={isLoading}>
             {isLoading ? "Signing in..." : "Sign in to FinanceFlow"}

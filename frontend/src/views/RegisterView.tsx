@@ -10,26 +10,27 @@ interface RegisterViewProps {
 }
 
 export const RegisterView: React.FC<RegisterViewProps> = ({ onAuthenticate, onSwitchToLogin }) => {
-
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  
   const [register, { isLoading, error }] = useRegisterMutation();
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
+      await register({ username, email, password }).unwrap();
       
-      await register({ username, password }).unwrap();
+      // Запазваме данните в localStorage, за да се ликнат веднага
+      localStorage.setItem("username", username);
+      localStorage.setItem("email", email);
 
-     
       alert("Registration successful! Please sign in.");
       onSwitchToLogin();
     } catch (err) {
       console.error("Registration error:", err);
+      setPassword("");
     }
   };
 
@@ -37,7 +38,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onAuthenticate, onSw
     <div className="auth-page">
       <AuthBrandArt />
       <main className="auth-form-wrap">
-        <form className="auth-form" onSubmit={handleSubmit}>
+        <form className="auth-form" onSubmit={handleSubmit} autoComplete="off">
           <div className="mobile-auth-logo">
             <Logo />
           </div>
@@ -45,10 +46,9 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onAuthenticate, onSw
           <h1>Create your account</h1>
           <p className="auth-sub">Join thousands taking control of their finances.</p>
 
-          {/* Error message for failed registration */}
           {error && (
             <div style={{ color: "red", fontSize: "0.875rem", marginBottom: "1rem" }}>
-              Registration failed. Username might already be taken.
+              Registration failed. Username or email might already be taken.
             </div>
           )}
 
@@ -59,6 +59,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onAuthenticate, onSw
               placeholder="Alex Morgan" 
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              autoComplete="off"
             />
           </div>
 
@@ -70,6 +71,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onAuthenticate, onSw
               placeholder="alex@example.com" 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="off"
             />
           </div>
 
@@ -77,7 +79,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onAuthenticate, onSw
             <div className="label-row">
               <label>Password</label>
             </div>
-            <div className="input-icon">
+            <div className="input-icon" style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <input 
                 type={showPassword ? "text" : "password"} 
                 required 
@@ -85,11 +87,24 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onAuthenticate, onSw
                 placeholder="At least 8 characters" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                style={{ width: '100%', paddingRight: '40px' }}
+                autoComplete="new-password"
               />
               <button 
                 type="button" 
                 onClick={() => setShowPassword(!showPassword)}
-                style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                style={{ 
+                  position: 'absolute', 
+                  right: '14px', 
+                  background: "none", 
+                  border: "none", 
+                  cursor: "pointer", 
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: '#667085',
+                  zIndex: 2
+                }}
               >
                 <Icon name="eye" size={18} />
               </button>
