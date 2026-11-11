@@ -40,14 +40,7 @@ class CategorySerializer(serializers.ModelSerializer):
         # Automatically assign the currently authenticated user to the category
         validated_data['user'] = self.context['request'].user
         return super().create(validated_data)
-    class Meta:
-        model = Category
-        fields = ['id', 'name', 'type']
-        read_only_fields = ['user']
-
-    def create(self, validated_data):
-        validated_data['user'] = self.context['request'].user
-        return super().create(validated_data)
+   
 
 
 # 4. Transactions (Supports Create, Read, Update, Delete with validation)
