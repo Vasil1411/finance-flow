@@ -15,16 +15,17 @@ export const transactionApi = apiSlice.injectEndpoints({
       providesTags: (_result, _error, id) => [{ type: 'Transaction', id }],
     }),
 
-    addTransaction: builder.mutation<Transaction, Partial<Transaction>>({
+    addTransaction: builder.mutation<Transaction, Partial<Transaction> | FormData>({
       query: (newTransaction) => ({
         url: 'transactions/',
         method: 'POST',
+        // Ако подаваме FormData (заради receipt_file), fetch автоматично задава правилния multipart/form-data хедър
         body: newTransaction,
       }),
       invalidatesTags: ['Transaction'],
     }),
 
-    updateTransaction: builder.mutation<Transaction, { id: number; data: Partial<Transaction> }>({
+    updateTransaction: builder.mutation<Transaction, { id: number; data: Partial<Transaction> | FormData }>({
       query: ({ id, data }) => ({
         url: `transactions/${id}/`,
         method: 'PUT',
@@ -40,10 +41,22 @@ export const transactionApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Transaction'],
     }),
+
+    // 🧾 Нов ендпойнт за AI сканиране на касови бележки и фактури
+    parseReceipt: builder.mutation<any, File>({
+      query: (file) => {
+        const formData = new FormData();
+        formData.append('receipt_file', file);
+        return {
+          url: 'transactions/parse-receipt/',
+          method: 'POST',
+          body: formData,
+        };
+      },
+    }),
     
   }), 
 }); 
-
 
 export const {
   useGetTransactionsQuery,
@@ -51,4 +64,5 @@ export const {
   useAddTransactionMutation,
   useUpdateTransactionMutation,
   useDeleteTransactionMutation,
+  useParseReceiptMutation, // Извличаме новия hook
 } = transactionApi;
