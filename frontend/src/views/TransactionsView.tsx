@@ -43,7 +43,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ openModal })
     setCurrentDate(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
   };
 
-  // Форматиране на месеца за показване (напр. "May 2025")
+  // Форматиране на месеца за показване (напр. "November 2026")
   const formattedMonthLabel = new Date(`${currentDate}-01`).toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
   // 1. Филтрираме транзакциите за избрания месец (датата е във формат "YYYY-MM-DD")
@@ -128,7 +128,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ openModal })
             <option value="EXPENSE">Expense</option>
           </select>
           
-          {/* Динамичен месечен пикер със стрелки вместо статичния текст */}
+          {/* Динамичен месечен пикер със стрелки */}
           <div className="month-picker" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: '#F9FAFB', border: '1px solid #D0D5DD', borderRadius: '8px' }}>
             <button type="button" onClick={handlePrevMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Previous month">
               <Icon name="chevron" size={16} />

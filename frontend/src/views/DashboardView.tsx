@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { StatCard } from '../components/StatCard';
 import { TransactionRows } from '../components/TransactionRows';
-import { Button } from '../components/UI';
 import { Icon } from '../components/Icon';
 import { useGetTransactionsQuery } from '../services/transactionsApi';
 import { useGetBudgetsQuery } from '../services/budgetsApi';
@@ -13,7 +12,7 @@ interface DashboardViewProps {
   onAdd: () => void;
 }
 
-export const DashboardView: React.FC<DashboardViewProps> = ({ setPage, onAdd }) => {
+export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
   const [currentDate, setCurrentDate] = useState(() => {
     const now = new Date();
     const year = now.getFullYear();
@@ -91,23 +90,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage, onAdd }) 
 
   return (
     <>
-      <div className="section-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <div className="quick-actions" style={{ display: 'flex', gap: '10px', margin: 0 }}>
-          <Button icon="plus" onClick={onAdd}>
-            Add transaction
-          </Button>
-          <Button icon="wallet" variant="secondary" onClick={() => setPage("budgets")}>
-            Set budget
-          </Button>
-        </div>
-
+      <div className="section-actions" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '24px' }}>
         <div className="month-picker" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: '#fff', border: '1px solid #D0D5DD', borderRadius: '8px' }}>
           <button type="button" onClick={handlePrevMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Previous month">
             <Icon name="chevron" size={16} />
           </button>
           <strong style={{ fontSize: '0.9rem', color: '#344054', minWidth: '100px', textAlign: 'center' }}>{formattedMonthLabel}</strong>
           <button type="button" onClick={handleNextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Next month">
-            <Icon name="chevron" size={16} style={{ transform: 'rotate(180deg)' }} />
+            <Icon name="chevron" size={16}  style={{ transform: 'rotate(180deg)' }} />
           </button>
         </div>
       </div>

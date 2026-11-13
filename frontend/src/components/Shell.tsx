@@ -2,13 +2,8 @@ import React, { type ReactNode, useState } from 'react';
 import { Logo } from './UI';
 import { Icon } from './Icon';
 import type { IconName } from '../types/icons';
-
-const navItems: { id: string; label: string; icon: IconName }[] = [
-  { id: "dashboard", label: "Overview", icon: "grid" },
-  { id: "transactions", label: "Transactions", icon: "swap" },
-  { id: "budgets", label: "Budgets & categories", icon: "wallet" },
-  { id: "goals", label: "Saving goals", icon: "target" },
-];
+import { TermsModal } from './TermsModal';
+import { PrivacyModal } from './PrivacyModal';
 
 interface ShellProps {
   page: string;
@@ -19,16 +14,33 @@ interface ShellProps {
 
 export const Shell: React.FC<ShellProps> = ({ page, setPage, onLogout, children }) => {
   const [mobileMenu, setMobileMenu] = useState(false);
+  const [activeModal, setActiveModal] = useState<'terms' | 'privacy' | null>(null);
 
-  // Извличаме само потребителското име и инициалите от localStorage
   const username = localStorage.getItem("username") || "User";
   const initials = username.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) || "U";
+  
+  // Проверяваме дали текущият потребител е администратор
+  const isAdmin = localStorage.getItem("is_staff") === "true";
+
+  // Стандартните навигационни елементи
+  const navItems: { id: string; label: string; icon: IconName }[] = [
+    { id: "dashboard", label: "Overview", icon: "grid" },
+    { id: "transactions", label: "Transactions", icon: "swap" },
+    { id: "budgets", label: "Budgets & categories", icon: "wallet" },
+    { id: "goals", label: "Saving goals", icon: "target" },
+  ];
+
+  // Ако е админ, добавяме и "Admin Panel" в менюто
+  if (isAdmin) {
+    navItems.push({ id: "admin", label: "Admin Panel", icon: "settings" });
+  }
 
   const names: Record<string, [string, string]> = {
-    dashboard: [`Good morning, ${username}`, "Here's how your money is doing this month."],
+    dashboard: [`Hello, ${username}`, "Here's how your money is doing this month."],
     transactions: ["Transactions", "View and manage all your income and expenses."],
     budgets: ["Budgets & categories", "Stay on track with your monthly spending plan."],
     goals: ["Saving goals", "Turn your plans into progress, one deposit at a time."],
+    admin: ["System Admin", "Monitor platform metrics and registered users."], // 👈 Заглавие за админ страницата
   };
 
   return (
@@ -62,7 +74,9 @@ export const Shell: React.FC<ShellProps> = ({ page, setPage, onLogout, children 
             <span>Settings</span>
           </button>
         </nav>
-        <div className="sidebar-foot">
+
+        {/* Лявото меню завършва с бадежа за профила и дискретни линкове за Terms & Privacy */}
+        <div className="sidebar-foot" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div className="mini-promo">
             <span className="spark">
               <Icon name="target" size={14} />
@@ -70,18 +84,38 @@ export const Shell: React.FC<ShellProps> = ({ page, setPage, onLogout, children 
             <strong>Money tip</strong>
             <p>Review your subscriptions monthly to keep expenses lean.</p>
           </div>
+
           <div className="profile">
             <div className="avatar">{initials}</div>
             <div>
               <strong>{username}</strong>
-              {/* Имейлът е премахнат напълно от тук */}
             </div>
             <button onClick={onLogout} title="Sign out" type="button">
               <Icon name="logout" size={17} />
             </button>
           </div>
+
+          {/* ⚖️ Дискретни легални линкове в самия край на лявото меню */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', fontSize: '0.75rem', paddingTop: '4px', borderTop: '1px solid #EAECF0' }}>
+            <button 
+              type="button" 
+              onClick={() => setActiveModal('terms')} 
+              style={{ background: 'none', border: 'none', color: '#98A2B3', cursor: 'pointer', fontSize: '0.75rem' }}
+            >
+              Terms
+            </button>
+            <span style={{ color: '#D0D5DD' }}>•</span>
+            <button 
+              type="button" 
+              onClick={() => setActiveModal('privacy')} 
+              style={{ background: 'none', border: 'none', color: '#98A2B3', cursor: 'pointer', fontSize: '0.75rem' }}
+            >
+              Privacy
+            </button>
+          </div>
         </div>
       </aside>
+
       {mobileMenu && (
         <button
           className="menu-overlay"
@@ -90,6 +124,7 @@ export const Shell: React.FC<ShellProps> = ({ page, setPage, onLogout, children 
           type="button"
         />
       )}
+
       <section className="main-area">
         <header className="topbar">
           <button className="menu-btn" onClick={() => setMobileMenu(true)} type="button">
@@ -110,8 +145,15 @@ export const Shell: React.FC<ShellProps> = ({ page, setPage, onLogout, children 
             <div className="avatar">{initials}</div>
           </div>
         </header>
-        <main className="page-content">{children}</main>
+
+        <main className="page-content">
+          {children}
+        </main>
       </section>
+
+      {/* Модали за легалните страници */}
+      {activeModal === 'terms' && <TermsModal onClose={() => setActiveModal(null)} />}
+      {activeModal === 'privacy' && <PrivacyModal onClose={() => setActiveModal(null)} />}
     </div>
   );
 };
