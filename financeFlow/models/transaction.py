@@ -22,6 +22,13 @@ class Transaction(models.Model):
     type = models.CharField(max_length=10, choices=TRANSACTION_TYPES)
     date = models.DateField()
     description = models.TextField(blank=True, null=True)
+    
+    # 🧾 Поле за прикачена бележка / фактура (картинка или PDF)
+    receipt_file = models.FileField(upload_to='receipts/', null=True, blank=True)
+    
+    # 🛒 Ново поле за съхранение на артикулите, цените и отстъпките (във формат JSON)
+    items = models.JSONField(default=list, blank=True, null=True)
+    
     created_at = models.DateTimeField(auto_now_add=True)
 
     def clean(self):
@@ -36,4 +43,4 @@ class Transaction(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.type}: {self.amount} - ({self.date})"
+        return f"{self.type}: {self.amount} ({self.date})"
