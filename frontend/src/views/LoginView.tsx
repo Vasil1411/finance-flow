@@ -133,13 +133,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticate, onSwitchTo
               {isLoggingIn ? "Signing in..." : "Sign in to FinanceFlow"}
             </Button>
 
-            <div className="divider">
-              <span>or continue with</span>
-            </div>
-
-            <button className="google-btn" type="button">
-              <span className="google-g">G</span> Google
-            </button>
+           
 
             <p className="auth-switch">
               Don't have an account?{" "}
