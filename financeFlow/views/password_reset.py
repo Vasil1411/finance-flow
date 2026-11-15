@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -9,13 +11,14 @@ from rest_framework.permissions import AllowAny
 from django.core.mail import send_mail
 from django.conf import settings
 
+logger = logging.getLogger(__name__)
+
 class RequestPasswordResetView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
         try:
             email = request.data.get('email')
-            print(f"DEBUG: Получен имейл за ресет -> {email}")
             
             user = User.objects.get(email=email)
             token = default_token_generator.make_token(user)
@@ -64,10 +67,7 @@ class RequestPasswordResetView(APIView):
             return Response({"message": "If the email exists, reset instructions have been sent."}, status=status.HTTP_200_OK)
             
         except Exception as e:
-            print("="*50)
-            print(f"❌ ТОЧНА ГРЕШКА: {str(e)}")
-            traceback.print_exc()
-            print("="*50)
+            logger.exception("Password reset request failed")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # Правилното:
