@@ -85,9 +85,13 @@ canvas {
     grid-column: 1 / -1;
   }
 
-  .dashboard-grid,
-  .budget-summary-grid {
+  .dashboard-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .budget-summary-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 16px !important;
   }
 
   .budget-cards,
@@ -197,9 +201,13 @@ canvas {
     grid-column: 1 / -1;
   }
 
-  .dashboard-grid,
-  .budget-summary-grid {
+  .dashboard-grid {
     grid-template-columns: 1fr;
+  }
+
+  .budget-summary-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
   }
 
   .budget-cards,
@@ -258,7 +266,6 @@ canvas {
     padding: 16px 12px 36px;
   }
 
-  /* 🛠️ Поправка за секционните действия и бутоните (транзакции и бюджети) */
   .quick-actions,
   .section-actions {
     align-items: stretch;
@@ -267,28 +274,79 @@ canvas {
   }
 
   .quick-actions .btn,
-  .section-actions > .btn,
-  .section-actions .month-picker {
+  .section-actions > .btn {
     width: 100%;
     justify-content: center;
   }
 
+  /* Бутоните "+ New Category" и "+ Create budget" в BudgetsView (изключваме .month-picker и .summary-pills) */
+  .section-actions > div:last-child:not(.month-picker):not(.summary-pills) {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px !important;
+    width: 100%;
+  }
+
+  .section-actions > div:last-child:not(.month-picker):not(.summary-pills) .btn {
+    width: 100%;
+    justify-content: center;
+    padding-left: 10px;
+    padding-right: 10px;
+    font-size: 13px;
+  }
+
+  /* Компактен и центриран .month-picker на един ред в DashboardView и BudgetsView */
+  .section-actions .month-picker {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: auto !important;
+    min-width: 210px;
+    margin: 0 auto !important;
+    padding: 6px 14px !important;
+    gap: 14px !important;
+  }
+
+  .section-actions .month-picker strong {
+    flex: 0 0 auto !important;
+    min-width: 115px !important;
+    text-align: center !important;
+  }
+
+  /* Income и Expenses в TransactionsView като две симетрични картички */
   .summary-pills {
-    justify-content: space-between;
-    gap: 10px;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+
+  .summary-pills > div {
+    background: #fff;
+    border: 1px solid #eaecf0;
+    border-radius: 12px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
 
   .summary-pills strong {
-    font-size: 12px;
+    font-size: 14px;
   }
 
   .stats-grid,
   .dashboard-grid,
-  .budget-summary-grid,
   .budget-cards,
   .goals-grid {
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+
+  /* Прегазване на inline gridTemplateColumns: '1.4fr 1fr' от BudgetsView */
+  .budget-summary-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
   }
 
   .stats-grid .stat-card:first-child {
@@ -322,17 +380,35 @@ canvas {
   }
 
   .rule-line span {
-    display: inline-block; /* Показваме подзаглавията за нужди/желания да не изчезват */
+    display: inline-block;
   }
 
-  /* 🛠️ Поправка за бюджета и разпределението му на мобилни */
+  /* Подреждане на редовете в картата Needs / Wants / Savings */
   .budget-summary-grid > div {
     width: 100%;
   }
 
+  .budget-summary-grid > .card:last-child {
+    padding: 16px !important;
+    gap: 12px !important;
+  }
+
+  .budget-summary-grid > .card:last-child > div {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 8px;
+  }
+
+  .budget-summary-grid > .card:last-child > div > span:last-child {
+    white-space: nowrap;
+    font-size: 14px;
+  }
+
+  /* TransactionsView: филтри, месечен пикер и плавен скрол на таблицата */
   .transactions-card {
-    padding: 13px;
-    overflow-x: hidden;
+    padding: 14px;
+    overflow: hidden;
   }
 
   .filters {
@@ -348,6 +424,21 @@ canvas {
     width: 100%;
   }
 
+  .filters .month-picker {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    padding: 8px 14px !important;
+    min-height: 42px;
+    box-sizing: border-box;
+  }
+
+  .filters .month-picker strong {
+    flex: 1 !important;
+    text-align: center !important;
+  }
+
   .table-summary {
     min-width: 0;
     gap: 12px;
@@ -359,6 +450,72 @@ canvas {
 
   .table-summary button {
     flex-shrink: 0;
+  }
+
+  /* Подредена 2-редова мобилна картичка за всяка транзакция */
+  .transaction-table {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    overflow-x: visible !important;
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  .transaction-table > .table-head {
+    display: none !important;
+  }
+
+  .transaction-table > .transaction-row {
+    display: grid !important;
+    grid-template-columns: auto auto 1fr auto !important;
+    grid-template-areas:
+      "main main main amount"
+      "cat  date .    actions" !important;
+    align-items: center !important;
+    gap: 10px 8px !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    padding: 14px !important;
+    border: 1px solid #eaecf0 !important;
+    border-radius: 12px !important;
+    background: #fff !important;
+  }
+
+  /* 1. Икона + Име + EXPENSE (горе вляво) */
+  .transaction-table > .transaction-row > *:nth-child(1) {
+    grid-area: main !important;
+    min-width: 0 !important;
+  }
+
+  /* 2. Категория (долу вляво) */
+  .transaction-table > .transaction-row > *:nth-child(2) {
+    grid-area: cat !important;
+  }
+
+  /* 3. Дата (долу до категорията) */
+  .transaction-table > .transaction-row > *:nth-child(3) {
+    grid-area: date !important;
+    font-size: 12px !important;
+    color: #667085 !important;
+  }
+
+  /* 4. Сума (горе вдясно) */
+  .transaction-table > .transaction-row > *:nth-child(4) {
+    grid-area: amount !important;
+    justify-self: end !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+  }
+
+  /* 5. Бутони за редакция и изтриване (долу вдясно) */
+  .transaction-table > .transaction-row > *:nth-child(5) {
+    grid-area: actions !important;
+    justify-self: end !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
   }
 
   .tabs {
@@ -453,6 +610,7 @@ canvas {
     min-height: 48px;
   }
 
+  /* AdminView inline layout overrides */
   [style*="max-width: 1200px"] {
     width: 100% !important;
     padding: 18px !important;
