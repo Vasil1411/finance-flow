@@ -68,11 +68,11 @@ export const Shell: React.FC<ShellProps> = ({ page, setPage, onLogout, children 
               <span>{item.label}</span>
             </button>
           ))}
-          <span className="nav-label settings-label">ACCOUNT</span>
-          <button type="button">
+          {/* <span className="nav-label settings-label">ACCOUNT</span>
+          {/* <button type="button">
             <Icon name="settings" />
             <span>Settings</span>
-          </button>
+          </button> */} 
         </nav>
 
         {/* Лявото меню завършва с бадежа за профила и дискретни линкове за Terms & Privacy */}
@@ -134,7 +134,7 @@ export const Shell: React.FC<ShellProps> = ({ page, setPage, onLogout, children 
             <h1>{names[page]?.[0] || `Good morning, ${username}`}</h1>
             <p>{names[page]?.[1] || ""}</p>
           </div>
-          <div className="top-actions">
+          {/* <div className="top-actions">
             <button className="icon-btn" type="button">
               <Icon name="search" />
             </button>
@@ -143,7 +143,7 @@ export const Shell: React.FC<ShellProps> = ({ page, setPage, onLogout, children 
               <i />
             </button>
             <div className="avatar">{initials}</div>
-          </div>
+          </div> */}
         </header>
 
         <main className="page-content">
