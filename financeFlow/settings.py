@@ -10,23 +10,38 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+import os
 from pathlib import Path
 from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Определяме средата: 'development' (по подразбиране) или 'production'
+ENVIRONMENT = os.environ.get('DJANGO_ENV', 'development')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-j8=!6tlh7lsyhdpsf3=ywugs9*y8v57)ctd%!tqzupaf6ox=$p'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-j8=!6tlh7lsyhdpsf3=ywugs9*y8v57)ctd%!tqzupaf6ox=$p')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True' if ENVIRONMENT == 'development' else False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost').split(',') if ENVIRONMENT != 'development' else ['*']
+
+
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+
+# Имейл настройки за Gmail SMTP (Четене от променливи на средата)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'FinanceFlow Support <noreply@financeflow.com>')
 
 
 # Application definition
@@ -58,6 +73,8 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
+    # Тук можеш да добавиш и линка на Vercel фронтенда, когато го получиш, напр.:
+    # "https://finance-flow-frontend.vercel.app",
 ]
 
 
@@ -65,7 +82,6 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
-
     'EXCEPTION_HANDLER': 'financeFlow.utils.exceptions.custom_exception_handler',
 }
 
@@ -137,26 +153,31 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 
-# Email
-# https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
-
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}
-
+# SimpleJWT settings
 SIMPLE_JWT = {
-    
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    
-    
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    
-    
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
-    
-   
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
+
+
+# --- Production Security Settings (Автоматично активиране при production) ---
+if ENVIRONMENT == 'production':
+    # Пренасочва всички HTTP заявки автоматично към HTTPS
+    SECURE_SSL_REDIRECT = True
+
+    # Защитава Session и CSRF бисквитките да се пращат само по шифрована връзка
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+    # HTTP Strict Transport Security (HSTS) - казва на браузъра винаги да ползва само HTTPS
+    SECURE_HSTS_SECONDS = 31536000  # 1 година
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+else:
+    # За локална разработка (development) ги изключваме, за да няма проблем с HTTP
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
