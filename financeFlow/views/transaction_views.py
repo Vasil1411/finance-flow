@@ -143,9 +143,13 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 "  * 'quantity': number (quantity of the item, default to 1 if not specified)." )
 
             models_to_try = [
-                'gemini-3.8-flash',
-                'gemini-3.5-flash-lite',
-                'gemini-3.1-flash-lite'
+                'gemini-3.8-flash',       # Най-новият и мощен Flash модел
+                'gemini-3.7-flash',       # Предходен надежден Flash модел
+                'gemini-3.6-flash',       # Работен кон от предишни поколения
+                'gemini-3.5-flash',       # Стабилен бърз модел
+                'gemini-3.5-flash-lite',  # Ултра бърз и лек модел
+                'gemini-3.1-flash-lite',  # Икономичен и ефективен
+                'gemini-4-argon'          # Флагмански модел с дълбоко мислене (поставяме го най-накрая като тежък резервен вариант)
             ]
             
             raw_response_text = None
