@@ -73,8 +73,7 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
-    # Тук можеш да добавиш и линка на Vercel фронтенда, когато го получиш, напр.:
-    # "https://finance-flow-frontend.vercel.app",
+    "https://finance-flow-navy-gamma.vercel.app"
 ]
 
 
