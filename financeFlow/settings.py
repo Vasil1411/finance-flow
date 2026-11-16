@@ -73,7 +73,7 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
-    "https://finance-flow-navy-gamma.vercel.app"
+    "https://finance-flow-git-main-a59666574-gmailcoms-projects.vercel.app"
 ]
 
 
