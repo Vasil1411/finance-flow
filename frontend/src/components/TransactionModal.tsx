@@ -61,7 +61,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction,
 
     } catch (err) {
       console.error("Failed to parse receipt with AI:", err);
-      setErrorMessage("Неуспешно разпознаване на бележката. Можете да добавите артикулите и сумата ръчно по-долу.");
+      setErrorMessage("Failed to parse receipt. Please check the file and try again.");
     }
   };
 
