@@ -6,7 +6,7 @@ import { DashboardView } from './views/DashboardView';
 import { TransactionsView } from './views/TransactionsView';
 import { BudgetsView } from './views/BudgetsView';
 import { GoalsView } from './views/GoalsView';
-import { AdminView } from './views/AdminView'; // 👈 НОВО: Импортираме нашия Админ панел
+import { AdminView } from './views/AdminView';
 import { Shell } from './components/Shell';
 import { TransactionModal } from './components/TransactionModal';
 import { useState } from 'react';
@@ -48,12 +48,11 @@ const AuthenticatedApp = ({ onLogout }: { onLogout: () => void }) => {
       <Shell page={currentPage} setPage={(p) => navigate(`/${p}`)} onLogout={onLogout}>
         <div style={{ flex: 1 }}>
           <Routes>
-            <Route path="/dashboard" element={<DashboardView setPage={(p) => navigate(`/${p}`)} onAdd={() => setModal({ open: true })} transactions={[]} />} />
-            <Route path="/transactions" element={<TransactionsView rows={[]} openModal={(t) => setModal({ open: true, transaction: t })} />} />
+            <Route path="/dashboard" element={<DashboardView setPage={(p) => navigate(`/${p}`)} />} />
+            <Route path="/transactions" element={<TransactionsView openModal={(t) => setModal({ open: true, transaction: t })} />} />
             <Route path="/budgets" element={<BudgetsView />} />
             <Route path="/goals" element={<GoalsView />} />
             
-            {/* 👈 НОВО: Маршрут за Админ панела (може да добавим и защитна проверка) */}
             <Route 
               path="/admin" 
               element={
@@ -96,7 +95,7 @@ export default function App() {
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('username');
     localStorage.removeItem('email');
-    localStorage.removeItem('is_staff'); // 👈 НОВО: Чистим и staff флага при изход
+    localStorage.removeItem('is_staff');
     dispatch(apiSlice.util.resetApiState());
     setToken(null);
   };

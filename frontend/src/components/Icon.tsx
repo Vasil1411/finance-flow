@@ -5,6 +5,7 @@ interface IconProps {
   name: IconName;
   size?: number;
   strokeWidth?: number;
+  style?: React.CSSProperties;
 }
 
 export const Icon: React.FC<IconProps> = ({ name, size = 20, strokeWidth = 1.8 }) => {

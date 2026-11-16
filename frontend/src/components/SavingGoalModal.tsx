@@ -1,4 +1,3 @@
-import React, { useState } from 'react';
 import { Icon } from './Icon';
 import { Button } from './UI';
 import type { SavingGoal } from '../types/saving-goal';

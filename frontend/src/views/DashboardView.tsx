@@ -9,7 +9,6 @@ import { useGetSavingGoalsQuery } from '../services/savingGoalsApi';
 
 interface DashboardViewProps {
   setPage: (p: string) => void;
-  onAdd: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
@@ -39,12 +38,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
   const { data: categories = [] } = useGetCategoriesQuery();
   const { data: goals = [] } = useGetSavingGoalsQuery();
 
-  // 1. Филтрираме транзакциите строго за избрания месец
   const monthTransactions = useMemo(() => {
     return transactions.filter((t: any) => t.date && t.date.startsWith(currentDate));
   }, [transactions, currentDate]);
 
-  // 2. Филтрираме бюджетите строго за избрания месец
   const monthBudgets = useMemo(() => {
     return budgets.filter((b: any) => b.month && b.month.startsWith(currentDate));
   }, [budgets, currentDate]);
@@ -59,7 +56,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
 
   const totalBalance = totalIncome - totalExpense;
 
-  // 3. Изчисляване на реалните суми по 50/30/20 групите спрямо категориите и бюджетите за месеца
   const groupAllocations = useMemo(() => {
     const groups = {
       Needs: { allocated: 0, target: totalIncome * 0.5 },
@@ -97,7 +93,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
           </button>
           <strong style={{ fontSize: '0.9rem', color: '#344054', minWidth: '100px', textAlign: 'center' }}>{formattedMonthLabel}</strong>
           <button type="button" onClick={handleNextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Next month">
-            <Icon name="chevron" size={16}  style={{ transform: 'rotate(180deg)' }} />
+            <Icon name="chevron" size={16} style={{ transform: 'rotate(180deg)' }} />
           </button>
         </div>
       </div>

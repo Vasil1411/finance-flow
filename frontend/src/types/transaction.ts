@@ -18,4 +18,5 @@ export interface Transaction {
   date: string; // YYYY-MM-DD
   description?: string;
   created_at?: string;
+  items?: any;
 }
