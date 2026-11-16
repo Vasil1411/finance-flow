@@ -174,7 +174,7 @@ export const BudgetsView: React.FC = () => {
             <div>
               <span className="eyebrow">TOTAL MONTHLY BUDGET</span>
               <h2>
-                ${totalSpentAll.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <small>of ${totalBudgetLimitAll.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</small>
+                €{totalSpentAll.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <small>of €{totalBudgetLimitAll.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</small>
               </h2>
             </div>
             <div className="budget-ring">
@@ -185,7 +185,7 @@ export const BudgetsView: React.FC = () => {
             <span style={{ width: `${Math.min(overallPercent, 100)}%`, background: "#516CE5" }} />
           </div>
           <div className="overall-labels" style={{ display: 'flex', justifyContent: 'space-between', color: '#667085', fontSize: '0.875rem' }}>
-            <span>${Math.max(totalBudgetLimitAll - totalSpentAll, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} remaining</span>
+            <span>€{Math.max(totalBudgetLimitAll - totalSpentAll, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} remaining</span>
             <span>Current month</span>
           </div>
         </div>
@@ -197,7 +197,7 @@ export const BudgetsView: React.FC = () => {
               <span style={{ fontWeight: 500, color: '#344054' }}>Needs</span>
             </div>
             <span style={{ fontWeight: 600, color: '#1D2939' }}>
-              ${groupTotals.Needs.spent.toLocaleString()} / ${groupTotals.Needs.limit.toLocaleString()}
+              €{groupTotals.Needs.spent.toLocaleString()} / €{groupTotals.Needs.limit.toLocaleString()}
             </span>
           </div>
 
@@ -207,7 +207,7 @@ export const BudgetsView: React.FC = () => {
               <span style={{ fontWeight: 500, color: '#344054' }}>Wants</span>
             </div>
             <span style={{ fontWeight: 600, color: '#1D2939' }}>
-              ${groupTotals.Wants.spent.toLocaleString()} / ${groupTotals.Wants.limit.toLocaleString()}
+              €{groupTotals.Wants.spent.toLocaleString()} / €{groupTotals.Wants.limit.toLocaleString()}
             </span>
           </div>
 
@@ -217,7 +217,7 @@ export const BudgetsView: React.FC = () => {
               <span style={{ fontWeight: 500, color: '#344054' }}>Savings</span>
             </div>
             <span style={{ fontWeight: 600, color: '#1D2939' }}>
-              ${groupTotals.Savings.spent.toLocaleString()} / ${groupTotals.Savings.limit.toLocaleString()}
+              €{groupTotals.Savings.spent.toLocaleString()} / €{groupTotals.Savings.limit.toLocaleString()}
             </span>
           </div>
         </div>
@@ -346,10 +346,10 @@ export const BudgetsView: React.FC = () => {
               
               <div className="budget-value" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '8px' }}>
                 <strong style={{ fontSize: '1.35rem', fontWeight: 700, color: '#1D2939' }}>
-                  ${spent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  €{spent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </strong>
                 <span style={{ fontSize: '0.9rem', color: '#667085' }}>
-                  of ${budgetLimit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  of €{budgetLimit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
 
@@ -362,7 +362,7 @@ export const BudgetsView: React.FC = () => {
                   {percent}% used
                 </span>
                 <strong style={{ color: percent > 100 ? "#D95E44" : "#344054" }}>
-                  {percent > 100 ? `$${(spent - budgetLimit).toLocaleString()} over` : `$${(budgetLimit - spent).toLocaleString()} left`}
+                  {percent > 100 ? `€${(spent - budgetLimit).toLocaleString()} over` : `€${(budgetLimit - spent).toLocaleString()} left`}
                 </strong>
               </div>
             </article>

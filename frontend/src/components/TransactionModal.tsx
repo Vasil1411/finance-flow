@@ -269,7 +269,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction,
         <div className="field amount-field">
           <label>Total Amount</label>
           <div>
-            <span>$</span>
+            <span>€</span>
             <input
               name="amount"
               required

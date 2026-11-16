@@ -70,7 +70,7 @@ export const SavingGoalModal: React.FC<SavingGoalModalProps> = ({ goal, onClose,
         <div className="field amount-field">
           <label>Target Amount</label>
           <div>
-            <span>$</span>
+            <span>€</span>
             <input
               name="target_amount"
               required
@@ -88,7 +88,7 @@ export const SavingGoalModal: React.FC<SavingGoalModalProps> = ({ goal, onClose,
           <div className="field amount-field">
             <label>Initial Saved Amount (Optional)</label>
             <div>
-              <span>$</span>
+              <span>€</span>
               <input
                 name="current_amount"
                 type="number"

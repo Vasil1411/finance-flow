@@ -72,7 +72,7 @@ export const GoalsView: React.FC = () => {
       <div className="section-actions">
         <div className="goals-total">
           <span>Total saved across goals</span>
-          <strong>${totalSaved.toLocaleString()}</strong>
+          <strong>€{totalSaved.toLocaleString()}</strong>
         </div>
         <Button icon="plus" onClick={handleOpenAddModal}>New saving goal</Button>
       </div>
@@ -161,20 +161,20 @@ export const GoalsView: React.FC = () => {
                 <Icon name="calendar" size={14} /> Goal date: {g.deadline || "No deadline"}
               </p>
               <div className="goal-money">
-                <strong>${current.toLocaleString()}</strong>
-                <span>of ${target.toLocaleString()}</span>
+                <strong>€{current.toLocaleString()}</strong>
+                <span>of €{target.toLocaleString()}</span>
               </div>
               <div className="progress">
                 <span style={{ width: `${Math.min(percent, 100)}%`, background: color }} />
               </div>
               <div className="goal-percent">
                 <span>{percent}% complete</span>
-                <strong>${(target - current).toLocaleString()} to go</strong>
+                <strong>€{(target - current).toLocaleString()} to go</strong>
               </div>
 
               {depositId === g.id ? (
                 <div className="deposit-confirm" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
-                  <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Enter amount to deposit ($):</span>
+                  <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Enter amount to deposit (€):</span>
                   <input
                     type="number"
                     step="0.01"

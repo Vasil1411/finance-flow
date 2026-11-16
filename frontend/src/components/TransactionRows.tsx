@@ -60,7 +60,7 @@ export const TransactionRows: React.FC<TransactionRowsProps> = ({ rows, compact 
             </span>
             <span className="date">{t.date}</span>
             <strong className={t.type === "INCOME" ? "income" : "expense"} style={{ textAlign: 'right' }}>
-              {t.type === "INCOME" ? "+" : "-"}$
+              {t.type === "INCOME" ? "+" : "-"}€
               {Math.abs(t.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </strong>
             {!compact && (

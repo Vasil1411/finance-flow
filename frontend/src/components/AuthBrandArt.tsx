@@ -17,7 +17,7 @@ export const AuthBrandArt: React.FC = () => {
               <Icon name="wallet" size={16} />
             </span>
           </div>
-          <strong>$24,680.50</strong>
+          <strong>€24,680.50</strong>
           <span className="art-up">
             <Icon name="arrowUp" size={12} /> 12.8% this month
           </span>
@@ -26,7 +26,7 @@ export const AuthBrandArt: React.FC = () => {
           <div className="chart-head">
             <div>
               <span>Cash flow</span>
-              <strong>$8,420</strong>
+              <strong>€8,420</strong>
             </div>
             <span className="chart-pill">May</span>
           </div>

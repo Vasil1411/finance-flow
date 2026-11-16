@@ -80,7 +80,7 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({ budget, onClose, onSav
         <div className="field amount-field">
           <label>Budget Amount</label>
           <div>
-            <span>$</span>
+            <span>€</span>
             <input
               name="amount"
               required

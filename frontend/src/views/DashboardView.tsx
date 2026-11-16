@@ -101,7 +101,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
       <section className="stats-grid">
         <StatCard
           label="Net Balance"
-          amount={`$${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          amount={`€${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           trend={totalBalance >= 0 ? "Positive" : "Negative"}
           icon="wallet"
           color="#526DE2"
@@ -109,7 +109,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
         />
         <StatCard
           label={`Income (${formattedMonthLabel})`}
-          amount={`$${totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          amount={`€${totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           trend="Real data"
           icon="arrowDown"
           color="#299D70"
@@ -117,7 +117,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
         />
         <StatCard
           label={`Expenses (${formattedMonthLabel})`}
-          amount={`$${totalExpense.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          amount={`€${totalExpense.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           trend="Real data"
           icon="arrowUp"
           color="#DF7451"
@@ -141,7 +141,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
             <div>
               <span>Allocated this month</span>
               <strong>
-                ${totalBudgetAllocated.toLocaleString()} <small>of ${totalIncome > 0 ? totalIncome.toLocaleString() : totalBudgetAllocated.toLocaleString()}</small>
+                €{totalBudgetAllocated.toLocaleString()} <small>of €{totalIncome > 0 ? totalIncome.toLocaleString() : totalBudgetAllocated.toLocaleString()}</small>
               </strong>
             </div>
             <div className="donut">
@@ -177,14 +177,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
                   </div>
                   <div className="rule-numbers" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                     <span style={{ color: '#667085' }}>
-                      ${allocNum.toLocaleString()} allocated (Target: ${targetNum.toLocaleString()})
+                      €{allocNum.toLocaleString()} allocated (Target: €{targetNum.toLocaleString()})
                     </span>
                     <strong style={{ color: isOver ? "#D95E44" : "#039855" }}>
                       {targetNum === 0 
                         ? "No target" 
                         : isOver 
-                        ? `$${diff.toLocaleString()} over` 
-                        : `$${diff.toLocaleString()} left`}
+                        ? `€${diff.toLocaleString()} over` 
+                        : `€${diff.toLocaleString()} left`}
                     </strong>
                   </div>
                 </div>
@@ -205,7 +205,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
           </div>
           <div className="spend-total">
             <span>Total spent</span>
-            <strong>${totalExpense.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+            <strong>€{totalExpense.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
             <small>
               <b>Active budgets:</b> {monthBudgets.length} | <b>Goals:</b> {goals.length}
             </small>

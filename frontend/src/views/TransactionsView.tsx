@@ -94,11 +94,11 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ openModal })
         <div className="summary-pills">
           <div>
             <span>Income</span>
-            <strong className="income">+${totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+            <strong className="income">+€{totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
           </div>
           <div>
             <span>Expenses</span>
-            <strong className="expense">-${totalExpense.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+            <strong className="expense">-€{totalExpense.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
           </div>
         </div>
         <Button icon="plus" onClick={() => openModal()}>
