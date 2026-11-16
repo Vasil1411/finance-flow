@@ -3,7 +3,8 @@ import { Button } from '../components/UI';
 import { Icon } from '../components/Icon';
 import { 
   useGetSavingGoalsQuery, 
-  useUpdateSavingGoalMutation 
+  useUpdateSavingGoalMutation,
+  useDeleteSavingGoalMutation 
 } from '../services/savingGoalsApi';
 import { SavingGoalModal } from '../components/SavingGoalModal';
 import type { SavingGoal } from '../types/saving-goal';
@@ -11,9 +12,11 @@ import type { SavingGoal } from '../types/saving-goal';
 export const GoalsView: React.FC = () => {
   const { data: goals = [], isLoading, error, refetch } = useGetSavingGoalsQuery();
   const [updateSavingGoal] = useUpdateSavingGoalMutation();
+  const [deleteSavingGoal] = useDeleteSavingGoalMutation();
   
   const [depositId, setDepositId] = useState<number | null>(null);
   const [depositAmount, setDepositAmount] = useState<string>("100");
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null); // 👈 НОВО: Стейт за потвърждение на изтриване
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<SavingGoal | null>(null);
 
@@ -35,6 +38,17 @@ export const GoalsView: React.FC = () => {
       setDepositAmount("100");
     } catch (err) {
       console.error("Failed to deposit funds:", err);
+    }
+  };
+
+  // Реално изтриване без alert
+  const handleDeleteGoal = async (id: number) => {
+    try {
+      await deleteSavingGoal(id).unwrap();
+      setDeleteConfirmId(null);
+      refetch();
+    } catch (err) {
+      console.error("Failed to delete goal:", err);
     }
   };
 
@@ -74,15 +88,74 @@ export const GoalsView: React.FC = () => {
           const iconName = "wallet";
 
           return (
-            <article className="card goal-card" key={g.id}>
-              <div className="goal-top">
+            <article className="card goal-card" key={g.id} style={{ position: 'relative' }}>
+              
+              {/* 🛑 ПОПЪП НОТИФИКАЦИЯ ЗА ПОТВЪРЖДЕНИЕ ДИРЕКТНО В КАРТАТА */}
+              {deleteConfirmId === g.id && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  backdropFilter: 'blur(4px)',
+                  zIndex: 10,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '20px',
+                  borderRadius: '12px',
+                  textAlign: 'center'
+                }}>
+                  <p style={{ margin: '0 0 12px 0', fontSize: '0.9rem', fontWeight: 600, color: '#1D2939' }}>
+                    Are you sure you want to delete this goal?
+                  </p>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button 
+                      onClick={() => setDeleteConfirmId(null)} 
+                      type="button" 
+                      style={{ padding: '6px 14px', background: '#F2F4F7', color: '#344054', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 500 }}
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteGoal(g.id)} 
+                      type="button" 
+                      style={{ padding: '6px 14px', background: '#D95E44', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 500 }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="goal-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span className="goal-icon" style={{ color, background: bg }}>
                   <Icon name={iconName} size={19} />
                 </span>
-                <button type="button" onClick={() => handleOpenEditModal(g)}>
-                  <Icon name="dots" />
-                </button>
+                
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button 
+                    type="button" 
+                    onClick={() => handleOpenEditModal(g)}
+                    title="Edit goal"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#667085' }}
+                  >
+                    <Icon name="dots" />
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setDeleteConfirmId(g.id)} // 👈 Отваря нашата вътрешна нотификация вместо alert
+                    title="Delete goal"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#D95E44' }}
+                  >
+                    <Icon name="close" size={16} />
+                  </button>
+                </div>
               </div>
+
               <h3>{g.name}</h3>
               <p>
                 <Icon name="calendar" size={14} /> Goal date: {g.deadline || "No deadline"}
