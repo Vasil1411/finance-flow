@@ -121,7 +121,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
             # ТУК Е ФИКСЪТ: Таймаутът се слага при инициализацията на Клиента!
             client = genai.Client(
                 api_key=api_key,
-                http_options={'timeout': 15000}
+                http_options={'timeout': 30}
             )
 
             image_part = types.Part.from_bytes(
@@ -166,7 +166,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
                         config=types.GenerateContentConfig(
                             response_mime_type="application/json",
                             temperature=0.1,
-                            max_output_tokens=1000
+                            max_output_tokens=4096
                         )
                     )
                     if response and response.text:
