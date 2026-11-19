@@ -62,19 +62,23 @@ export const BudgetsView: React.FC = () => {
   // Форматиране на месеца за показване (напр. "May 2025")
   const formattedMonthLabel = new Date(`${currentDate}-01`).toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
-  // Строго филтриране само на разходи и изключване на фантомни групи
-  const expenseCategories = categories.filter((c: Category) => {
-    const isExpense = c.type?.toUpperCase() === 'EXPENSE';
+  // Включваме и EXPENSE, и INCOME категории, като изключваме само фантомните групи
+  const validCategories = categories.filter((c: Category) => {
+    const typeUpper = c.type?.toUpperCase();
+    const isValidType = typeUpper === 'EXPENSE' || typeUpper === 'INCOME';
     const nameUpper = (c.name || "").toUpperCase();
     const isPhantomGroup = nameUpper === 'NEEDS' || nameUpper === 'WANTS' || nameUpper === 'SAVINGS';
-    return isExpense && !isPhantomGroup;
+    return isValidType && !isPhantomGroup;
   });
 
-  // Филтрация по табове (All, Needs, Wants, Savings)
-  const visibleCategories = expenseCategories.filter((c: Category) => {
+  // Филтрация по табове (All, Needs, Wants, Savings, Income)
+  const visibleCategories = validCategories.filter((c: Category) => {
+    const isIncome = c.type?.toUpperCase() === 'INCOME';
     if (active === "All") return true;
+    if (active === "Income") return isIncome;
+
+    if (isIncome) return false;
     const alloc = (c.allocation_type || "").toUpperCase();
-    
     if (active === "Needs") return alloc.includes('NEED');
     if (active === "Wants") return alloc.includes('WANT');
     if (active === "Savings") return alloc.includes('SAVING') || alloc.includes('SAVINGS');
@@ -96,29 +100,32 @@ export const BudgetsView: React.FC = () => {
     Savings: { spent: 0, limit: 0 },
   };
 
-  expenseCategories.forEach((cat: Category) => {
-    const matchedBudget = currentMonthBudgets.find((b: Budget) => b.category === cat.id);
-    const budgetLimit = matchedBudget ? Number(matchedBudget.amount) : 0;
-    
-    const spent = currentMonthTransactions
-      .filter((t: any) => (t.category === cat.id || t.category_name === cat.name) && t.type?.toUpperCase() === 'EXPENSE')
-      .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0);
+  // Общият месечен бюджет и правилото 50/30/20 се изчисляват само върху разходните категории
+  validCategories
+    .filter((cat: Category) => cat.type?.toUpperCase() === 'EXPENSE')
+    .forEach((cat: Category) => {
+      const matchedBudget = currentMonthBudgets.find((b: Budget) => b.category === cat.id);
+      const budgetLimit = matchedBudget ? Number(matchedBudget.amount) : 0;
+      
+      const spent = currentMonthTransactions
+        .filter((t: any) => (t.category === cat.id || t.category_name === cat.name) && t.type?.toUpperCase() === 'EXPENSE')
+        .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0);
 
-    totalSpentAll += spent;
-    totalBudgetLimitAll += budgetLimit;
+      totalSpentAll += spent;
+      totalBudgetLimitAll += budgetLimit;
 
-    const alloc = (cat.allocation_type || "").toUpperCase();
-    if (alloc.includes('NEED')) {
-      groupTotals.Needs.spent += spent;
-      groupTotals.Needs.limit += budgetLimit;
-    } else if (alloc.includes('WANT')) {
-      groupTotals.Wants.spent += spent;
-      groupTotals.Wants.limit += budgetLimit;
-    } else if (alloc.includes('SAVING')) {
-      groupTotals.Savings.spent += spent;
-      groupTotals.Savings.limit += budgetLimit;
-    }
-  });
+      const alloc = (cat.allocation_type || "").toUpperCase();
+      if (alloc.includes('NEED')) {
+        groupTotals.Needs.spent += spent;
+        groupTotals.Needs.limit += budgetLimit;
+      } else if (alloc.includes('WANT')) {
+        groupTotals.Wants.spent += spent;
+        groupTotals.Wants.limit += budgetLimit;
+      } else if (alloc.includes('SAVING')) {
+        groupTotals.Savings.spent += spent;
+        groupTotals.Savings.limit += budgetLimit;
+      }
+    });
 
   const overallPercent = totalBudgetLimitAll > 0 ? Math.round((totalSpentAll / totalBudgetLimitAll) * 100) : 0;
 
@@ -225,7 +232,7 @@ export const BudgetsView: React.FC = () => {
 
       {/* Табове за филтриране */}
       <div className="tabs">
-        {["All", "Needs", "Wants", "Savings"].map((t) => (
+        {["All", "Needs", "Wants", "Savings", "Income"].map((t) => (
           <button key={t} className={active === t ? "active" : ""} onClick={() => setActive(t)} type="button">
             {t}
           </button>
@@ -234,20 +241,33 @@ export const BudgetsView: React.FC = () => {
 
       <section className="budget-cards">
         {visibleCategories.map((cat: Category) => {
-          const matchedBudget = currentMonthBudgets.find((b: Budget) => b.category === cat.id);
+          const isIncome = cat.type?.toUpperCase() === 'INCOME';
+          const matchedBudget = isIncome ? undefined : currentMonthBudgets.find((b: Budget) => b.category === cat.id);
           const budgetLimit = matchedBudget ? Number(matchedBudget.amount) : 0;
           
-          const spent = currentMonthTransactions
-            .filter((t: any) => (t.category === cat.id || t.category_name === cat.name) && t.type?.toUpperCase() === 'EXPENSE')
+          const amountTotal = currentMonthTransactions
+            .filter((t: any) => (t.category === cat.id || t.category_name === cat.name) && t.type?.toUpperCase() === (isIncome ? 'INCOME' : 'EXPENSE'))
             .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0);
 
-          const percent = budgetLimit > 0 ? Math.round((spent / budgetLimit) * 100) : 0;
-          const catStyle = categoriesConfig[cat.name] || { color: "#516CE5", bg: "#EDF0FF", icon: cat.name[0]?.toUpperCase() || "C" };
+          const percent = budgetLimit > 0 ? Math.round((amountTotal / budgetLimit) * 100) : 0;
+          const catStyle = categoriesConfig[cat.name] || {
+            color: isIncome ? "#17B26A" : "#516CE5",
+            bg: isIncome ? "#ECFDF3" : "#EDF0FF",
+            icon: cat.name[0]?.toUpperCase() || "C"
+          };
           
           const allocUpper = (cat.allocation_type || "NEED").toUpperCase();
-          const typeLabel = allocUpper.includes('WANT') ? 'WANT' : allocUpper.includes('SAVING') ? 'SAVINGS' : 'NEED';
+          const typeLabel = isIncome
+            ? 'INCOME'
+            : allocUpper.includes('WANT')
+            ? 'WANT'
+            : allocUpper.includes('SAVING')
+            ? 'SAVINGS'
+            : 'NEED';
           
-          const badgeStyles = typeLabel === 'WANT' 
+          const badgeStyles = isIncome
+            ? { color: '#039855', bg: '#ECFDF3' }
+            : typeLabel === 'WANT' 
             ? { color: '#7F56D9', bg: '#F4EBFF' }
             : typeLabel === 'SAVINGS'
             ? { color: '#039855', bg: '#ECFDF3' }
@@ -290,17 +310,19 @@ export const BudgetsView: React.FC = () => {
                       minWidth: '150px',
                       border: '1px solid #EAECF0'
                     }}>
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          setOpenMenuId(null);
-                          setSelectedBudget(matchedBudget || { id: 0, category: cat.id, amount: 0, month: `${currentDate}-01` });
-                          setIsBudgetModalOpen(true);
-                        }}
-                        style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '8px 12px', fontSize: '0.875rem', cursor: 'pointer', color: '#344054', borderRadius: '6px' }}
-                      >
-                        {matchedBudget ? "Edit budget" : "Set budget"}
-                      </button>
+                      {!isIncome && (
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            setOpenMenuId(null);
+                            setSelectedBudget(matchedBudget || { id: 0, category: cat.id, amount: 0, month: `${currentDate}-01` });
+                            setIsBudgetModalOpen(true);
+                          }}
+                          style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '8px 12px', fontSize: '0.875rem', cursor: 'pointer', color: '#344054', borderRadius: '6px' }}
+                        >
+                          {matchedBudget ? "Edit budget" : "Set budget"}
+                        </button>
+                      )}
 
                       <button 
                         type="button"
@@ -314,7 +336,7 @@ export const BudgetsView: React.FC = () => {
                         Edit category
                       </button>
 
-                      {matchedBudget && (
+                      {!isIncome && matchedBudget && (
                         <button 
                           type="button"
                           onClick={() => {
@@ -344,27 +366,49 @@ export const BudgetsView: React.FC = () => {
 
               <h3 style={{ marginTop: '12px', fontSize: '1.1rem', fontWeight: 600, color: '#1D2939' }}>{cat.name}</h3>
               
-              <div className="budget-value" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '8px' }}>
-                <strong style={{ fontSize: '1.35rem', fontWeight: 700, color: '#1D2939' }}>
-                  €{spent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </strong>
-                <span style={{ fontSize: '0.9rem', color: '#667085' }}>
-                  of €{budgetLimit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
+              {isIncome ? (
+                <>
+                  <div className="budget-value" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '8px' }}>
+                    <strong style={{ fontSize: '1.35rem', fontWeight: 700, color: '#039855' }}>
+                      +€{amountTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </strong>
+                    <span style={{ fontSize: '0.9rem', color: '#667085' }}>
+                      received
+                    </span>
+                  </div>
+                  <div className="progress" style={{ margin: '12px 0 8px 0', background: '#ECFDF3', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>
+                    <span style={{ display: 'block', height: '100%', width: amountTotal > 0 ? '100%' : '0%', background: '#17B26A', borderRadius: '4px' }} />
+                  </div>
+                  <div className="budget-status" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span style={{ color: '#667085', fontWeight: 500 }}>Income category</span>
+                    <strong style={{ color: '#039855' }}>{formattedMonthLabel}</strong>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="budget-value" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '8px' }}>
+                    <strong style={{ fontSize: '1.35rem', fontWeight: 700, color: '#1D2939' }}>
+                      €{amountTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </strong>
+                    <span style={{ fontSize: '0.9rem', color: '#667085' }}>
+                      of €{budgetLimit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
 
-              <div className="progress" style={{ margin: '12px 0 8px 0', background: '#EAECF0', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>
-                <span style={{ display: 'block', height: '100%', width: `${Math.min(percent, 100)}%`, background: percent > 100 ? "#E06A4E" : catStyle.color, borderRadius: '4px' }} />
-              </div>
+                  <div className="progress" style={{ margin: '12px 0 8px 0', background: '#EAECF0', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>
+                    <span style={{ display: 'block', height: '100%', width: `${Math.min(percent, 100)}%`, background: percent > 100 ? "#E06A4E" : catStyle.color, borderRadius: '4px' }} />
+                  </div>
 
-              <div className="budget-status" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                <span style={{ color: percent > 100 ? "#D95E44" : "#667085", fontWeight: 500 }}>
-                  {percent}% used
-                </span>
-                <strong style={{ color: percent > 100 ? "#D95E44" : "#344054" }}>
-                  {percent > 100 ? `€${(spent - budgetLimit).toLocaleString()} over` : `€${(budgetLimit - spent).toLocaleString()} left`}
-                </strong>
-              </div>
+                  <div className="budget-status" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span style={{ color: percent > 100 ? "#D95E44" : "#667085", fontWeight: 500 }}>
+                      {percent}% used
+                    </span>
+                    <strong style={{ color: percent > 100 ? "#D95E44" : "#344054" }}>
+                      {percent > 100 ? `€${(amountTotal - budgetLimit).toLocaleString()} over` : `€${(budgetLimit - amountTotal).toLocaleString()} left`}
+                    </strong>
+                  </div>
+                </>
+              )}
             </article>
           );
         })}
