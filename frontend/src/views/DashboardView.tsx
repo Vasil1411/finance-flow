@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { StatCard } from '../components/StatCard';
 import { TransactionRows } from '../components/TransactionRows';
+import { BudgetRuleCard } from '../components/BudgetRuleCard';
+import { MonthPicker, formatMonthLabel } from '../components/MonthPicker';
 import { Icon } from '../components/Icon';
 import { useGetTransactionsQuery } from '../services/transactionsApi';
 import { useGetBudgetsQuery } from '../services/budgetsApi';
@@ -19,19 +21,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
     return `${year}-${month}`;
   });
 
-  const handlePrevMonth = () => {
-    const [year, month] = currentDate.split('-').map(Number);
-    const date = new Date(year, month - 2, 1);
-    setCurrentDate(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
-  };
-
-  const handleNextMonth = () => {
-    const [year, month] = currentDate.split('-').map(Number);
-    const date = new Date(year, month, 1);
-    setCurrentDate(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
-  };
-
-  const formattedMonthLabel = new Date(`${currentDate}-01`).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  const formattedMonthLabel = formatMonthLabel(currentDate);
 
   const { data: transactions = [], isLoading: loadingTx } = useGetTransactionsQuery();
   const { data: budgets = [] } = useGetBudgetsQuery();
@@ -81,21 +71,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
     return groups;
   }, [monthBudgets, categories, totalIncome]);
 
-  const totalBudgetAllocated = groupAllocations.Needs.allocated + groupAllocations.Wants.allocated + groupAllocations.Savings.allocated;
+  const totalBudgetAllocated =
+    groupAllocations.Needs.allocated + groupAllocations.Wants.allocated + groupAllocations.Savings.allocated;
   const plannedPercent = totalIncome > 0 ? Math.min(Math.round((totalBudgetAllocated / totalIncome) * 100), 100) : 0;
 
   return (
     <>
-      <div className="section-actions" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '24px' }}>
-        <div className="month-picker" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: '#fff', border: '1px solid #D0D5DD', borderRadius: '8px' }}>
-          <button type="button" onClick={handlePrevMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Previous month">
-            <Icon name="chevron" size={16} />
-          </button>
-          <strong style={{ fontSize: '0.9rem', color: '#344054', minWidth: '100px', textAlign: 'center' }}>{formattedMonthLabel}</strong>
-          <button type="button" onClick={handleNextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Next month">
-            <Icon name="chevron" size={16} style={{ transform: 'rotate(180deg)' }} />
-          </button>
-        </div>
+      <div
+        className="section-actions"
+        style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '24px' }}
+      >
+        <MonthPicker currentDate={currentDate} onChange={setCurrentDate} variant="default" />
       </div>
 
       <section className="stats-grid">
@@ -126,72 +112,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
       </section>
 
       <section className="dashboard-grid">
-        <div className="card budget-rule">
-          <div className="card-heading">
-            <div>
-              <span className="eyebrow">MONTHLY PLAN</span>
-              <h2>50 / 30 / 20 budget rule</h2>
-              <p>A balanced way to put your budget to work for {formattedMonthLabel}.</p>
-            </div>
-            <button type="button" onClick={() => setPage("budgets")}>
-              <Icon name="dots" />
-            </button>
-          </div>
-          <div className="rule-total">
-            <div>
-              <span>Allocated this month</span>
-              <strong>
-                €{totalBudgetAllocated.toLocaleString()} <small>of €{totalIncome > 0 ? totalIncome.toLocaleString() : totalBudgetAllocated.toLocaleString()}</small>
-              </strong>
-            </div>
-            <div className="donut">
-              <span>
-                {plannedPercent}%<small>planned</small>
-              </span>
-            </div>
-          </div>
-          <div className="rule-items">
-            {[
-              ["Needs", "Essentials & bills", 50, groupAllocations.Needs.allocated, groupAllocations.Needs.target || totalBudgetAllocated * 0.5, "#5B8DEF"],
-              ["Wants", "Lifestyle & fun", 30, groupAllocations.Wants.allocated, groupAllocations.Wants.target || totalBudgetAllocated * 0.3, "#9874DE"],
-              ["Savings", "Future & goals", 20, groupAllocations.Savings.allocated, groupAllocations.Savings.target || totalBudgetAllocated * 0.2, "#2EA879"],
-            ].map(([name, sub, pct, allocated, target, color]) => {
-              const allocNum = Number(allocated);
-              const targetNum = Number(target);
-              const progressWidth = targetNum > 0 ? Math.min(Math.round((allocNum / targetNum) * 100), 100) : 0;
-              const isOver = allocNum > targetNum && targetNum > 0;
-              const diff = Math.abs(allocNum - targetNum);
-
-              return (
-                <div className="rule-item" key={name as string}>
-                  <div className="rule-line">
-                    <div>
-                      <i style={{ background: color as string }} />
-                      <strong>{name}</strong>
-                      <span>{sub}</span>
-                    </div>
-                    <b>{pct}%</b>
-                  </div>
-                  <div className="progress">
-                    <span style={{ width: `${progressWidth}%`, background: isOver ? "#E06A4E" : (color as string) }} />
-                  </div>
-                  <div className="rule-numbers" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span style={{ color: '#667085' }}>
-                      €{allocNum.toLocaleString()} allocated (Target: €{targetNum.toLocaleString()})
-                    </span>
-                    <strong style={{ color: isOver ? "#D95E44" : "#039855" }}>
-                      {targetNum === 0 
-                        ? "No target" 
-                        : isOver 
-                        ? `€${diff.toLocaleString()} over` 
-                        : `€${diff.toLocaleString()} left`}
-                    </strong>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <BudgetRuleCard
+          formattedMonthLabel={formattedMonthLabel}
+          totalBudgetAllocated={totalBudgetAllocated}
+          totalIncome={totalIncome}
+          plannedPercent={plannedPercent}
+          groupAllocations={groupAllocations}
+          onOpenBudgets={() => setPage("budgets")}
+        />
 
         <div className="card spending-card">
           <div className="card-heading">
@@ -236,7 +164,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
         ) : monthTransactions.length > 0 ? (
           <TransactionRows rows={monthTransactions.slice(0, 5)} compact />
         ) : (
-          <p style={{ padding: '1.5rem', color: '#667085', textAlign: 'center' }}>No transactions recorded for {formattedMonthLabel}.</p>
+          <p style={{ padding: '1.5rem', color: '#667085', textAlign: 'center' }}>
+            No transactions recorded for {formattedMonthLabel}.
+          </p>
         )}
       </section>
     </>

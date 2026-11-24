@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icon } from './Icon';
 import { Button } from './UI';
+import { TransactionItemsSection, type TransactionItem } from './TransactionItemsSection';
 import type { Transaction, TransactionType } from '../types/transaction';
 import { useAddTransactionMutation, useUpdateTransactionMutation, useParseReceiptMutation } from '../services/transactionsApi';
 import { useGetCategoriesQuery } from '../services/categoriesApi';
@@ -18,10 +19,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction,
   const [descVal, setDescVal] = useState<string>(transaction?.description || "");
   const [categoryVal, setCategoryVal] = useState<string>(transaction?.category ? String(transaction.category) : "");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  
-  // Списък с артикули (поддържа име, цена и количество)
-  const [scannedItems, setScannedItems] = useState<Array<{ name: string; price: string; quantity?: number }>>([]);
-  
+  const [scannedItems, setScannedItems] = useState<TransactionItem[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,7 +30,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction,
 
   const { data: categories = [] } = useGetCategoriesQuery();
 
-  const filteredCategories = categories.filter((c: any) => 
+  const filteredCategories = categories.filter((c: any) =>
     !c.type || c.type.toUpperCase() === type.toUpperCase()
   );
 
@@ -49,16 +47,15 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction,
 
     try {
       const result = await parseReceipt(file).unwrap();
-      
+
       if (result.amount) setAmountVal(result.amount);
       if (result.type) setType(result.type as TransactionType);
       if (result.date) setDateVal(result.date);
       if (result.description) setDescVal(result.description);
-      
+
       if (result.items && Array.isArray(result.items)) {
         setScannedItems(result.items);
       }
-
     } catch (err) {
       console.error("Failed to parse receipt with AI:", err);
       setErrorMessage("Failed to parse receipt. Please check the file and try again.");
@@ -66,19 +63,19 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction,
   };
 
   const handleAddItem = () => {
-    setScannedItems(prev => [...prev, { name: "", price: "", quantity: 1 }]);
+    setScannedItems((prev) => [...prev, { name: "", price: "", quantity: 1 }]);
   };
 
-  const handleItemChange = (index: number, field: string, value: string | number) => {
-    setScannedItems(prev => {
-      const newItems = [...prev];
-      newItems[index] = { ...newItems[index], [field]: value };
-      return newItems;
+  const handleItemChange = (index: number, field: keyof TransactionItem, value: string | number) => {
+    setScannedItems((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
     });
   };
 
   const handleRemoveItem = (index: number) => {
-    setScannedItems(prev => prev.filter((_, i) => i !== index));
+    setScannedItems((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
@@ -89,7 +86,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction,
     dataToSend.append("type", type);
     dataToSend.append("date", dateVal);
     dataToSend.append("description", descVal);
-    
+
     if (categoryVal) {
       dataToSend.append("category", categoryVal);
     }
@@ -151,102 +148,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction,
           </div>
         )}
 
-        {/* 📝 Секция за артикули с просторен дизайн и зелени отстъпки */}
-        <div style={{ marginBottom: '20px', background: '#F8F9FC', border: '1px solid #EAECF0', borderRadius: '12px', padding: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#344054', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Transaction Items ({scannedItems.length})
-            </span>
-            <button 
-              type="button" 
-              onClick={handleAddItem}
-              style={{ background: '#EEF2FF', color: '#4F46E5', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-            >
-              + Add item manually
-            </button>
-          </div>
-          
-          {scannedItems.length > 0 ? (
-            <div style={{ maxHeight: '250px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px' }}>
-              {scannedItems.map((item, idx) => {
-                // Проверяваме дали редът е отстъпка
-                const isDiscount = String(item.price).includes('-') || 
-                                   item.name.toLowerCase().includes('отстъпка') || 
-                                   item.name.toLowerCase().includes('discount') || 
-                                   item.name.toLowerCase().includes('xtra');
+        <TransactionItemsSection
+          items={scannedItems}
+          onAddItem={handleAddItem}
+          onItemChange={handleItemChange}
+          onRemoveItem={handleRemoveItem}
+        />
 
-                return (
-                  <div 
-                    key={idx} 
-                    style={{ 
-                      display: 'flex', 
-                      gap: '12px', 
-                      alignItems: 'center', 
-                      background: isDiscount ? '#F0FDF4' : '#FFFFFF', // 🟢 Зелен фон за отстъпка
-                      padding: '10px 14px', 
-                      borderRadius: '8px', 
-                      border: `1px solid ${isDiscount ? '#BBF7D0' : '#E5E7EB'}`,
-                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
-                    }}
-                  >
-                    <input
-                      type="text"
-                      placeholder="Item name (e.g. bananas, XTRA отстъпка)"
-                      value={item.name}
-                      onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
-                      style={{ 
-                        flex: 1, 
-                        padding: '8px 12px', 
-                        border: '1px solid #D1D5DB', 
-                        borderRadius: '6px', 
-                        fontSize: '0.9rem',
-                        background: isDiscount ? '#F7FEE7' : '#FFFFFF',
-                        color: isDiscount ? '#166534' : '#1F2937',
-                        fontWeight: isDiscount ? 500 : 400,
-                        outline: 'none'
-                      }}
-                      required
-                    />
-                    <input
-                      type="text"
-                      placeholder="0.00"
-                      value={item.price}
-                      onChange={(e) => handleItemChange(idx, 'price', e.target.value)}
-                      style={{ 
-                        width: '110px', 
-                        padding: '8px 12px', 
-                        border: `1px solid ${isDiscount ? '#86EFAC' : '#D1D5DB'}`, 
-                        borderRadius: '6px', 
-                        fontSize: '0.9rem', 
-                        textAlign: 'right',
-                        fontWeight: 600,
-                        color: isDiscount ? '#15803D' : '#111827', // 🟢 Зелен цвят за сумата при отстъпка
-                        background: isDiscount ? '#F7FEE7' : '#FFFFFF',
-                        outline: 'none'
-                      }}
-                      required
-                    />
-                    <button 
-                      type="button" 
-                      onClick={() => handleRemoveItem(idx)}
-                      style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', fontSize: '1.1rem', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'color 0.2s' }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = '#EF4444'}
-                      onMouseLeave={(e) => e.currentTarget.style.color = '#9CA3AF'}
-                      title="Delete item"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '16px', color: '#6B7280', fontSize: '0.85rem', background: '#FFFFFF', borderRadius: '8px', border: '1px dashed #E5E7EB' }}>
-              No items added yet. Upload a receipt or click „Add item manually“.
-            </div>
-          )}
-        </div>
-        
         <div className="type-toggle">
           <button
             type="button"
@@ -286,10 +194,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction,
         <div className="form-row">
           <div className="field">
             <label>Category</label>
-            <select 
-              name="category" 
-              value={categoryVal} 
-              onChange={(e) => setCategoryVal(e.target.value)} 
+            <select
+              name="category"
+              value={categoryVal}
+              onChange={(e) => setCategoryVal(e.target.value)}
               required
             >
               <option value="" disabled>Select category...</option>
@@ -302,10 +210,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction,
           </div>
           <div className="field">
             <label>Date</label>
-            <input 
-              name="date" 
-              required 
-              type="date" 
+            <input
+              name="date"
+              required
+              type="date"
               value={dateVal}
               onChange={(e) => setDateVal(e.target.value)}
             />

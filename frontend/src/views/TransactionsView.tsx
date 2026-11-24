@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { Button } from '../components/UI';
 import { Icon } from '../components/Icon';
 import { TransactionRows } from '../components/TransactionRows';
+import { TransactionFilters } from '../components/TransactionFilters';
+import { formatMonthLabel } from '../components/MonthPicker';
 import type { Transaction } from '../types/transaction';
 import { useGetTransactionsQuery, useDeleteTransactionMutation } from '../services/transactionsApi';
 import { useGetCategoriesQuery } from '../services/categoriesApi';
@@ -18,38 +20,18 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ openModal })
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All categories");
   const [type, setType] = useState("All types");
-  
-  // Състояние за текущо избрания месец във формат "YYYY-MM" (по подразбиране текущия месец)
   const [currentDate, setCurrentDate] = useState(() => {
     const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    return `${year}-${month}`;
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
-  
-  // Състояние за нашия собствен красив модал за изтриване
   const [deleteModalId, setDeleteModalId] = useState<number | null>(null);
 
-  // Функции за смяна на месеца със стрелките
-  const handlePrevMonth = () => {
-    const [year, month] = currentDate.split('-').map(Number);
-    const date = new Date(year, month - 2, 1);
-    setCurrentDate(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
-  };
+  const formattedMonthLabel = formatMonthLabel(currentDate);
 
-  const handleNextMonth = () => {
-    const [year, month] = currentDate.split('-').map(Number);
-    const date = new Date(year, month, 1);
-    setCurrentDate(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
-  };
-
-  // Форматиране на месеца за показване (напр. "November 2026")
-  const formattedMonthLabel = new Date(`${currentDate}-01`).toLocaleString('en-US', { month: 'long', year: 'numeric' });
-
-  // 1. Филтрираме транзакциите за избрания месец (датата е във формат "YYYY-MM-DD")
-  const monthTransactions = useMemo(() => {
-    return rows.filter((t: any) => t.date && t.date.startsWith(currentDate));
-  }, [rows, currentDate]);
+  const monthTransactions = useMemo(
+    () => rows.filter((t: any) => t.date && t.date.startsWith(currentDate)),
+    [rows, currentDate],
+  );
 
   const totalIncome = monthTransactions
     .filter((t) => t.type?.toUpperCase() === 'INCOME')
@@ -61,27 +43,24 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ openModal })
 
   const hasFilters = query !== "" || category !== "All categories" || type !== "All types";
 
-  // 2. Прилагаме търсенето, категорията и типа върху месечните транзакции
   const filtered = useMemo(
     () =>
       monthTransactions.filter((t) => {
         const matchesQuery = (t.description || "").toLowerCase().includes(query.toLowerCase());
         const matchesCategory = category === "All categories" || t.category_name === category;
         const matchesType = type === "All types" || t.type?.toUpperCase() === type.toUpperCase();
-        
         return matchesQuery && matchesCategory && matchesType;
       }),
     [monthTransactions, query, category, type],
   );
 
   const confirmDelete = async () => {
-    if (deleteModalId !== null) {
-      try {
-        await deleteTransaction(deleteModalId).unwrap();
-        setDeleteModalId(null);
-      } catch (err) {
-        console.error("Failed to delete transaction:", err);
-      }
+    if (deleteModalId === null) return;
+    try {
+      await deleteTransaction(deleteModalId).unwrap();
+      setDeleteModalId(null);
+    } catch (err) {
+      console.error("Failed to delete transaction:", err);
     }
   };
 
@@ -107,38 +86,17 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ openModal })
       </div>
 
       <section className="card transactions-card">
-        <div className="filters">
-          <div className="search-box">
-            <Icon name="search" size={18} />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search transactions..."
-            />
-          </div>
-          <select value={category} onChange={(e) => setCategory(e.target.value)}>
-            <option>All categories</option>
-            {categories.map((c: any) => (
-              <option key={c.id} value={c.name}>{c.name}</option>
-            ))}
-          </select>
-          <select value={type} onChange={(e) => setType(e.target.value)}>
-            <option>All types</option>
-            <option value="INCOME">Income</option>
-            <option value="EXPENSE">Expense</option>
-          </select>
-          
-          {/* Динамичен месечен пикер със стрелки */}
-          <div className="month-picker" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: '#F9FAFB', border: '1px solid #D0D5DD', borderRadius: '8px' }}>
-            <button type="button" onClick={handlePrevMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Previous month">
-              <Icon name="chevron" size={16} />
-            </button>
-            <strong style={{ fontSize: '0.9rem', color: '#344054', minWidth: '90px', textAlign: 'center' }}>{formattedMonthLabel}</strong>
-            <button type="button" onClick={handleNextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Next month">
-              <Icon name="chevron" size={16} style={{ transform: 'rotate(180deg)' }} />
-            </button>
-          </div>
-        </div>
+        <TransactionFilters
+          query={query}
+          onQueryChange={setQuery}
+          category={category}
+          onCategoryChange={setCategory}
+          type={type}
+          onTypeChange={setType}
+          currentDate={currentDate}
+          onDateChange={setCurrentDate}
+          categories={categories}
+        />
 
         <div className="table-summary" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <p>
@@ -186,7 +144,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ openModal })
         )}
       </section>
 
-      {/* Персонален модал за потвърждение на изтриването */}
       {deleteModalId !== null && (
         <div className="modal-backdrop" onMouseDown={() => setDeleteModalId(null)}>
           <div className="modal" style={{ maxWidth: '400px', padding: '24px' }} onMouseDown={(e) => e.stopPropagation()}>
@@ -201,8 +158,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ openModal })
               <Button variant="secondary" onClick={() => setDeleteModalId(null)} type="button">
                 Cancel
               </Button>
-              <Button 
-                onClick={confirmDelete} 
+              <Button
+                onClick={confirmDelete}
                 disabled={isDeleting}
                 style={{ background: '#E06A4E', color: '#fff' }}
                 type="button"
