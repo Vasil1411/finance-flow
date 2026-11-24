@@ -6,8 +6,20 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from financeFlow.models import Budget, Category, Transaction
+from financeFlow.models import Budget, Transaction
 from financeFlow.serializers import BudgetSerializer
+
+
+def _parse_year_month(month_str: str):
+    """Очаква YYYY-MM (или YYYY-MM-DD) и връща (year_int, month_int)."""
+    parts = month_str.split('-')
+    if len(parts) < 2 or not (parts[0].isdigit() and parts[1].isdigit()):
+        raise ValueError("Invalid month format")
+    year_int = int(parts[0])
+    month_int = int(parts[1])
+    if not (1 <= month_int <= 12):
+        raise ValueError("Month out of range")
+    return year_int, month_int
 
 
 class BudgetViewSet(viewsets.ModelViewSet):
@@ -21,7 +33,11 @@ class BudgetViewSet(viewsets.ModelViewSet):
         # Filter by month for the "Budgets & categories" screen (for example ?month=2026-11)
         month = self.request.query_params.get('month')
         if month:
-            queryset = queryset.filter(month__startswith=month)
+            try:
+                year_int, month_int = _parse_year_month(month)
+                queryset = queryset.filter(month__year=year_int, month__month=month_int)
+            except ValueError:
+                return queryset.none()
 
         return queryset
 
@@ -57,7 +73,11 @@ class BudgetViewSet(viewsets.ModelViewSet):
 
         # 1. Budgets & remaining amount for the selected month
         budgets_qs = (
-            Budget.objects.filter(user=user, month__startswith=month_prefix)
+            Budget.objects.filter(
+                user=user,
+                month__year=year_int,
+                month__month=month_int,
+            )
             .select_related('category')
         )
 
@@ -66,7 +86,8 @@ class BudgetViewSet(viewsets.ModelViewSet):
             Transaction.objects.filter(
                 user=user,
                 type='EXPENSE',
-                date__startswith=month_prefix,
+                date__year=year_int,
+                date__month=month_int,
                 category__isnull=False,
             )
             .values('category_id')
@@ -112,7 +133,8 @@ class BudgetViewSet(viewsets.ModelViewSet):
             Transaction.objects.filter(
                 user=user,
                 type='INCOME',
-                date__startswith=month_prefix,
+                date__year=year_int,
+                date__month=month_int,
             ).aggregate(total=Sum('amount'))['total']
             or Decimal('0.00')
         )
@@ -129,7 +151,8 @@ class BudgetViewSet(viewsets.ModelViewSet):
             Transaction.objects.filter(
                 user=user,
                 type='EXPENSE',
-                date__startswith=month_prefix,
+                date__year=year_int,
+                date__month=month_int,
             )
             .values('category__allocation_type')
             .annotate(total=Sum('amount'))

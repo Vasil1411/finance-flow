@@ -1,17 +1,47 @@
+import io
 import json
 from decimal import Decimal
-from datetime import date
-from django.db import transaction as db_transaction
-from django.db.models import Q
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from financeFlow.models import Transaction, Budget
-from financeFlow.serializers import TransactionSerializer, BudgetSerializer
+
 from django.conf import settings
+from django.db import transaction as db_transaction
 from google import genai
 from google.genai import types
+from PIL import Image
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from financeFlow.models import SavingGoal, Transaction
+from financeFlow.serializers import TransactionSerializer
+
+
+def _parse_items_field(request_data):
+    """Връща списък с items или None, ако ключът 'items' не присъства в заявката."""
+    if 'items' not in request_data:
+        return None
+
+    items_raw = request_data.get('items')
+    if items_raw is None or items_raw == '':
+        return []
+    if isinstance(items_raw, str):
+        try:
+            parsed = json.loads(items_raw)
+            return parsed if isinstance(parsed, list) else []
+        except json.JSONDecodeError:
+            return []
+    if isinstance(items_raw, list):
+        return items_raw
+    return []
+
+
+def _apply_goal_delta(goal: SavingGoal, delta: Decimal):
+    """Актуализира сумата и статуса на SavingGoal безопасно."""
+    updated = (goal.current_amount or Decimal('0.00')) + delta
+    goal.current_amount = max(Decimal('0.00'), updated)
+    if goal.target_amount is not None:
+        goal.is_completed = goal.current_amount >= goal.target_amount
+    goal.save()
 
 
 class TransactionViewSet(viewsets.ModelViewSet):
@@ -42,51 +72,77 @@ class TransactionViewSet(viewsets.ModelViewSet):
         return queryset.order_by('-date')
 
     def perform_create(self, serializer):
-        # Обработваме сурови данни или FormData, включително евентуални "items" пратени като JSON стринг
-        items_raw = self.request.data.get('items')
-        parsed_items = []
-        if items_raw:
-            if isinstance(items_raw, str):
-                try:
-                    parsed_items = json.loads(items_raw)
-                except json.JSONDecodeError:
-                    parsed_items = []
-            elif isinstance(items_raw, list):
-                parsed_items = items_raw
+        parsed_items = _parse_items_field(self.request.data)
+        items_to_save = parsed_items if parsed_items is not None else []
 
-        serializer.save(user=self.request.user, items=parsed_items)
+        with db_transaction.atomic():
+            instance = serializer.save(user=self.request.user, items=items_to_save)
+
+            if instance.saving_goal_id and instance.type == 'EXPENSE':
+                goal = (
+                    SavingGoal.objects.select_for_update()
+                    .filter(pk=instance.saving_goal_id, user=self.request.user)
+                    .first()
+                )
+                if goal:
+                    _apply_goal_delta(goal, instance.amount or Decimal('0.00'))
 
     def perform_update(self, serializer):
-        items_raw = self.request.data.get('items')
-        parsed_items = None
-        if items_raw is not None:
-            if isinstance(items_raw, str):
-                try:
-                    parsed_items = json.loads(items_raw)
-                except json.JSONDecodeError:
-                    parsed_items = []
-            elif isinstance(items_raw, list):
-                parsed_items = items_raw
+        instance = serializer.instance
 
+        old_goal_id = instance.saving_goal_id
+        old_amount = instance.amount or Decimal('0.00')
+        old_type = instance.type
+
+        parsed_items = _parse_items_field(self.request.data)
+        save_kwargs = {}
         if parsed_items is not None:
-            serializer.save(items=parsed_items)
-        else:
-            serializer.save()
+            save_kwargs['items'] = parsed_items
+
+        with db_transaction.atomic():
+            # 1. Заключваме и връщаме стария ефект върху старата цел (ако има такъв)
+            if old_goal_id and old_type == 'EXPENSE':
+                old_goal = (
+                    SavingGoal.objects.select_for_update()
+                    .filter(pk=old_goal_id, user=self.request.user)
+                    .first()
+                )
+                if old_goal:
+                    _apply_goal_delta(old_goal, -old_amount)
+
+            # 2. Записваме обновената транзакция
+            updated_instance = serializer.save(**save_kwargs)
+
+            new_goal_id = updated_instance.saving_goal_id
+            new_amount = updated_instance.amount or Decimal('0.00')
+            new_type = updated_instance.type
+
+            # 3. Прилагаме новия ефект върху новата цел (ако има такъв)
+            if new_goal_id and new_type == 'EXPENSE':
+                new_goal = (
+                    SavingGoal.objects.select_for_update()
+                    .filter(pk=new_goal_id, user=self.request.user)
+                    .first()
+                )
+                if new_goal:
+                    _apply_goal_delta(new_goal, new_amount)
 
     def perform_destroy(self, instance):
         with db_transaction.atomic():
-            goal = instance.saving_goal
+            goal_id = instance.saving_goal_id
             amount = instance.amount or Decimal('0.00')
             tx_type = instance.type
 
             super().perform_destroy(instance)
 
-            if goal and tx_type == 'EXPENSE':
-                updated_amount = (goal.current_amount or Decimal('0.00')) - amount
-                goal.current_amount = max(Decimal('0.00'), updated_amount)
-                if goal.target_amount is not None:
-                    goal.is_completed = goal.current_amount >= goal.target_amount
-                goal.save()
+            if goal_id and tx_type == 'EXPENSE':
+                goal = (
+                    SavingGoal.objects.select_for_update()
+                    .filter(pk=goal_id, user=self.request.user)
+                    .first()
+                )
+                if goal:
+                    _apply_goal_delta(goal, -amount)
 
     @action(detail=False, methods=['POST'], url_path='parse-receipt')
     def parse_receipt(self, request):
@@ -114,9 +170,6 @@ class TransactionViewSet(viewsets.ModelViewSet):
             # ---- ОПТИМИЗАЦИЯ С PILLOW (За да не чакате 2 минути) ----
             if not file_name.endswith('.pdf'):
                 try:
-                    from PIL import Image
-                    import io
-
                     img = Image.open(io.BytesIO(file_bytes))
                     img.verify()
 
@@ -135,7 +188,6 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
             api_key = getattr(settings, 'GEMINI_API_KEY', None)
 
-            # ТУК Е ФИКСЪТ: Таймаутът се слага при инициализацията на Клиента!
             client = genai.Client(
                 api_key=api_key,
                 http_options={'timeout': 15000}

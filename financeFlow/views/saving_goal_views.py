@@ -12,6 +12,18 @@ from financeFlow.models import Budget, Category, SavingGoal, Transaction
 from financeFlow.serializers import SavingGoalSerializer, TransactionSerializer
 
 
+def _parse_year_month(date_str: str):
+    """Очаква YYYY-MM или YYYY-MM-DD и връща (year_int, month_int, 'YYYY-MM')."""
+    parts = date_str.split('-')
+    if len(parts) < 2 or not (parts[0].isdigit() and parts[1].isdigit()):
+        raise ValueError("Invalid date format")
+    year_int = int(parts[0])
+    month_int = int(parts[1])
+    if not (1 <= month_int <= 12):
+        raise ValueError("Month out of range")
+    return year_int, month_int, f"{year_int:04d}-{month_int:02d}"
+
+
 class SavingGoalViewSet(viewsets.ModelViewSet):
     serializer_class = SavingGoalSerializer
     permission_classes = [IsAuthenticated]
@@ -21,7 +33,7 @@ class SavingGoalViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['POST'], url_path='contribute')
     def contribute(self, request, pk=None):
-        goal = self.get_object()
+        goal_lookup = self.get_object()
         raw_amount = request.data.get('amount')
 
         try:
@@ -39,8 +51,15 @@ class SavingGoalViewSet(viewsets.ModelViewSet):
             )
 
         tx_date_str = str(request.data.get('date') or date.today())
-        month_prefix = tx_date_str[:7]  # YYYY-MM
-        description = request.data.get('description') or f"Contribution to goal: {goal.name}"
+        try:
+            year_int, month_int, month_prefix = _parse_year_month(tx_date_str)
+        except ValueError:
+            return Response(
+                {"error": "Invalid 'date' format. Use YYYY-MM-DD."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        description = request.data.get('description') or f"Contribution to goal: {goal_lookup.name}"
 
         create_tx = request.data.get('create_transaction', True)
         if isinstance(create_tx, str):
@@ -69,58 +88,77 @@ class SavingGoalViewSet(viewsets.ModelViewSet):
                 allocation_type='SAVINGS',
             ).first()
 
-        # Проверка за наличност във фонда (месечен бюджет за SAVINGS категорията, ако има)
-        available_in_fund = None
-        fund_source = None
+        created_transaction = None
 
-        if savings_category:
-            monthly_budget = Budget.objects.filter(
-                user=request.user,
-                category=savings_category,
-                month__startswith=month_prefix,
-            ).first()
+        with db_transaction.atomic():
+            # Заключваме целевия SavingGoal ред при конкурентни заявки
+            goal = (
+                SavingGoal.objects.select_for_update()
+                .filter(pk=goal_lookup.pk, user=request.user)
+                .first()
+            )
+            if not goal:
+                return Response(
+                    {"error": "Saving goal not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
 
-            if monthly_budget:
-                spent_in_fund = (
-                    Transaction.objects.filter(
+            available_in_fund = None
+            fund_source = None
+
+            # Проверка за наличност във фонда (месечен бюджет за SAVINGS категорията, ако има)
+            if savings_category:
+                monthly_budget = (
+                    Budget.objects.select_for_update()
+                    .filter(
                         user=request.user,
                         category=savings_category,
-                        type='EXPENSE',
-                        date__startswith=month_prefix,
-                    ).aggregate(total=Sum('amount'))['total']
+                        month__year=year_int,
+                        month__month=month_int,
+                    )
+                    .first()
+                )
+
+                if monthly_budget:
+                    spent_in_fund = (
+                        Transaction.objects.filter(
+                            user=request.user,
+                            category=savings_category,
+                            type='EXPENSE',
+                            date__year=year_int,
+                            date__month=month_int,
+                        ).aggregate(total=Sum('amount'))['total']
+                        or Decimal('0.00')
+                    )
+                    available_in_fund = (monthly_budget.amount or Decimal('0.00')) - spent_in_fund
+                    fund_source = f"monthly_budget:{savings_category.name}({month_prefix})"
+
+            # Ако няма зададен месечен бюджет за фонда, проверяваме общия нетен баланс
+            if available_in_fund is None:
+                total_income = (
+                    Transaction.objects.filter(user=request.user, type='INCOME')
+                    .aggregate(total=Sum('amount'))['total']
                     or Decimal('0.00')
                 )
-                available_in_fund = (monthly_budget.amount or Decimal('0.00')) - spent_in_fund
-                fund_source = f"monthly_budget:{savings_category.name}({month_prefix})"
+                total_expenses = (
+                    Transaction.objects.filter(user=request.user, type='EXPENSE')
+                    .aggregate(total=Sum('amount'))['total']
+                    or Decimal('0.00')
+                )
+                available_in_fund = total_income - total_expenses
+                fund_source = "overall_net_balance"
 
-        # Ако няма зададен месечен бюджет за фонда, проверяваме общия нетен баланс
-        if available_in_fund is None:
-            total_income = (
-                Transaction.objects.filter(user=request.user, type='INCOME')
-                .aggregate(total=Sum('amount'))['total']
-                or Decimal('0.00')
-            )
-            total_expenses = (
-                Transaction.objects.filter(user=request.user, type='EXPENSE')
-                .aggregate(total=Sum('amount'))['total']
-                or Decimal('0.00')
-            )
-            available_in_fund = total_income - total_expenses
-            fund_source = "overall_net_balance"
+            if amount > available_in_fund and not force_override:
+                return Response(
+                    {
+                        "error": "Insufficient funds in savings fund.",
+                        "fund_source": fund_source,
+                        "requested_amount": f"{amount:.2f}",
+                        "available_amount": f"{available_in_fund:.2f}",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        if amount > available_in_fund and not force_override:
-            return Response(
-                {
-                    "error": "Insufficient funds in savings fund.",
-                    "fund_source": fund_source,
-                    "requested_amount": f"{amount:.2f}",
-                    "available_amount": f"{available_in_fund:.2f}",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        created_transaction = None
-        with db_transaction.atomic():
             goal.current_amount = (goal.current_amount or Decimal('0.00')) + amount
             goal.save()
 
