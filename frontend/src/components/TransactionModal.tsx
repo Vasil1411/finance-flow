@@ -12,6 +12,47 @@ interface TransactionModalProps {
   onSave: () => void;
 }
 
+function extractApiErrorMessage(err: any): string {
+  const data = err?.data;
+  if (!data) {
+    return "Failed to save transaction. Please try again.";
+  }
+
+  if (typeof data === 'string') {
+    return data;
+  }
+
+  if (typeof data.error === 'string') {
+    const parts = [data.error];
+    if (data.available_amount !== undefined) {
+      parts.push(`Available in fund: €${data.available_amount}`);
+    }
+    if (data.requested_amount !== undefined) {
+      parts.push(`Requested additional: €${data.requested_amount}`);
+    }
+    return parts.join(" • ");
+  }
+
+  if (Array.isArray(data) && data.length > 0) {
+    return String(data[0]);
+  }
+
+  if (typeof data === 'object') {
+    const firstKey = Object.keys(data)[0];
+    if (firstKey) {
+      const val = data[firstKey];
+      if (Array.isArray(val) && val.length > 0) {
+        return `${firstKey}: ${String(val[0])}`;
+      }
+      if (typeof val === 'string') {
+        return `${firstKey}: ${val}`;
+      }
+    }
+  }
+
+  return "Failed to save transaction. Please try again.";
+}
+
 export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction, onClose, onSave }) => {
   const [type, setType] = useState<TransactionType>(transaction?.type || "EXPENSE");
   const [amountVal, setAmountVal] = useState<string>(transaction ? String(Math.abs(transaction.amount)) : "");
@@ -25,6 +66,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction,
   useEffect(() => {
     if (transaction?.items && Array.isArray(transaction.items)) {
       setScannedItems(transaction.items);
+    } else {
+      setScannedItems([]);
     }
   }, [transaction]);
 
@@ -80,6 +123,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction,
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setErrorMessage(null);
 
     const dataToSend = new FormData();
     dataToSend.append("amount", amountVal);
@@ -89,6 +133,11 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction,
 
     if (categoryVal) {
       dataToSend.append("category", categoryVal);
+    }
+
+    const existingGoalId = (transaction as any)?.saving_goal;
+    if (existingGoalId !== undefined && existingGoalId !== null) {
+      dataToSend.append("saving_goal", String(existingGoalId));
     }
 
     if (selectedFile) {
@@ -107,8 +156,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction,
       }
       onSave();
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to save transaction:", err);
+      setErrorMessage(extractApiErrorMessage(err));
     }
   };
 

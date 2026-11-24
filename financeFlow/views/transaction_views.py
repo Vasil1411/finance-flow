@@ -4,15 +4,17 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.db import transaction as db_transaction
+from django.db.models import Sum
 from google import genai
 from google.genai import types
 from PIL import Image
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from financeFlow.models import SavingGoal, Transaction
+from financeFlow.models import Budget, Category, SavingGoal, Transaction
 from financeFlow.serializers import TransactionSerializer
 
 
@@ -42,6 +44,70 @@ def _apply_goal_delta(goal: SavingGoal, delta: Decimal):
     if goal.target_amount is not None:
         goal.is_completed = goal.current_amount >= goal.target_amount
     goal.save()
+
+
+def _validate_savings_fund_for_delta(user, tx_date, additional_amount: Decimal):
+    """
+    Проверява дали има достатъчно остатък в месечния SAVINGS бюджет за дадения месец
+    (или в общия нетен баланс, ако за месеца няма зададен SAVINGS бюджет).
+    """
+    if additional_amount <= Decimal('0.00'):
+        return
+
+    month_prefix = str(tx_date or '')[:7]
+    savings_categories = Category.objects.filter(
+        user=user,
+        type='EXPENSE',
+        allocation_type='SAVINGS',
+    )
+
+    savings_budget_total = None
+    if month_prefix:
+        savings_budget_total = Budget.objects.filter(
+            user=user,
+            category__in=savings_categories,
+            month__startswith=month_prefix,
+        ).aggregate(total=Sum('amount'))['total']
+
+    if savings_budget_total is not None:
+        spent_in_savings = (
+            Transaction.objects.filter(
+                user=user,
+                category__in=savings_categories,
+                type='EXPENSE',
+                date__startswith=month_prefix,
+            ).aggregate(total=Sum('amount'))['total']
+            or Decimal('0.00')
+        )
+        available = savings_budget_total - spent_in_savings
+        if additional_amount > available:
+            raise ValidationError({
+                "error": "Insufficient funds in savings fund.",
+                "fund_source": f"monthly_savings_budget({month_prefix})",
+                "requested_amount": f"{additional_amount:.2f}",
+                "available_amount": f"{max(Decimal('0.00'), available):.2f}",
+            })
+        return
+
+    # Резервна проверка спрямо общия нетен баланс, ако няма зададен месечен SAVINGS бюджет
+    total_income = (
+        Transaction.objects.filter(user=user, type='INCOME')
+        .aggregate(total=Sum('amount'))['total']
+        or Decimal('0.00')
+    )
+    total_expenses = (
+        Transaction.objects.filter(user=user, type='EXPENSE')
+        .aggregate(total=Sum('amount'))['total']
+        or Decimal('0.00')
+    )
+    net_balance = total_income - total_expenses
+    if additional_amount > net_balance:
+        raise ValidationError({
+            "error": "Insufficient funds in savings fund.",
+            "fund_source": "overall_net_balance",
+            "requested_amount": f"{additional_amount:.2f}",
+            "available_amount": f"{max(Decimal('0.00'), net_balance):.2f}",
+        })
 
 
 class TransactionViewSet(viewsets.ModelViewSet):
@@ -76,6 +142,18 @@ class TransactionViewSet(viewsets.ModelViewSet):
         items_to_save = parsed_items if parsed_items is not None else []
 
         with db_transaction.atomic():
+            validated_type = serializer.validated_data.get('type')
+            validated_goal = serializer.validated_data.get('saving_goal')
+            validated_amount = serializer.validated_data.get('amount') or Decimal('0.00')
+            validated_date = serializer.validated_data.get('date')
+
+            if validated_type == 'EXPENSE' and validated_goal:
+                _validate_savings_fund_for_delta(
+                    user=self.request.user,
+                    tx_date=validated_date,
+                    additional_amount=validated_amount,
+                )
+
             instance = serializer.save(user=self.request.user, items=items_to_save)
 
             if instance.saving_goal_id and instance.type == 'EXPENSE':
@@ -100,7 +178,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
             save_kwargs['items'] = parsed_items
 
         with db_transaction.atomic():
-            # 1. Заключваме и връщаме стария ефект върху старата цел (ако има такъв)
+            # 1. Заключваме и временно връщаме стария ефект върху старата цел (ако има такъв)
             if old_goal_id and old_type == 'EXPENSE':
                 old_goal = (
                     SavingGoal.objects.select_for_update()
@@ -110,22 +188,41 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 if old_goal:
                     _apply_goal_delta(old_goal, -old_amount)
 
-            # 2. Записваме обновената транзакция
+            # 2. Валидираме преди да запишем новата сума (при заделяне към цел)
+            new_type = serializer.validated_data.get('type', instance.type)
+            new_goal = serializer.validated_data.get('saving_goal', instance.saving_goal)
+            new_amount = serializer.validated_data.get('amount', instance.amount) or Decimal('0.00')
+            new_date = serializer.validated_data.get('date', instance.date)
+
+            if new_type == 'EXPENSE' and new_goal:
+                if old_goal_id == new_goal.id and old_type == 'EXPENSE':
+                    additional_needed = new_amount - old_amount
+                else:
+                    additional_needed = new_amount
+
+                if additional_needed > Decimal('0.00'):
+                    _validate_savings_fund_for_delta(
+                        user=self.request.user,
+                        tx_date=new_date,
+                        additional_amount=additional_needed,
+                    )
+
+            # 3. Записваме обновената транзакция
             updated_instance = serializer.save(**save_kwargs)
 
-            new_goal_id = updated_instance.saving_goal_id
-            new_amount = updated_instance.amount or Decimal('0.00')
-            new_type = updated_instance.type
+            final_goal_id = updated_instance.saving_goal_id
+            final_amount = updated_instance.amount or Decimal('0.00')
+            final_type = updated_instance.type
 
-            # 3. Прилагаме новия ефект върху новата цел (ако има такъв)
-            if new_goal_id and new_type == 'EXPENSE':
-                new_goal = (
+            # 4. Прилагаме новия ефект върху новата цел (ако има такъв)
+            if final_goal_id and final_type == 'EXPENSE':
+                new_goal_obj = (
                     SavingGoal.objects.select_for_update()
-                    .filter(pk=new_goal_id, user=self.request.user)
+                    .filter(pk=final_goal_id, user=self.request.user)
                     .first()
                 )
-                if new_goal:
-                    _apply_goal_delta(new_goal, new_amount)
+                if new_goal_obj:
+                    _apply_goal_delta(new_goal_obj, final_amount)
 
     def perform_destroy(self, instance):
         with db_transaction.atomic():
