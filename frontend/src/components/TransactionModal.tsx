@@ -12,45 +12,81 @@ interface TransactionModalProps {
   onSave: () => void;
 }
 
+function formatScalarOrList(val: any): string {
+  if (Array.isArray(val)) {
+    return val.map((item) => formatScalarOrList(item)).filter(Boolean).join(", ");
+  }
+  if (val && typeof val === "object") {
+    return Object.entries(val)
+      .map(([k, v]) => `${k}: ${formatScalarOrList(v)}`)
+      .filter(Boolean)
+      .join(" | ");
+  }
+  if (val === undefined || val === null || val === "") {
+    return "";
+  }
+  return String(val);
+}
+
 function extractApiErrorMessage(err: any): string {
   const data = err?.data;
+
   if (!data) {
-    return "Failed to save transaction. Please try again.";
+    const fallback = err?.error || err?.message;
+    return fallback ? String(fallback) : "Failed to save transaction. Please try again.";
   }
 
   if (typeof data === 'string') {
+    if (data.trim().startsWith("<")) {
+      return `Server error (${err?.status || "unknown"}). Check backend logs.`;
+    }
     return data;
   }
 
-  if (typeof data.error === 'string') {
-    const parts = [data.error];
+  if (typeof data === 'object') {
+    const parts: string[] = [];
+
+    if (data.error !== undefined && data.error !== null) {
+      const errText = formatScalarOrList(data.error);
+      if (errText) parts.push(errText);
+    }
+
     if (data.available_amount !== undefined) {
       parts.push(`Available in fund: €${data.available_amount}`);
     }
+
     if (data.requested_amount !== undefined) {
       parts.push(`Requested additional: €${data.requested_amount}`);
     }
-    return parts.join(" • ");
-  }
 
-  if (Array.isArray(data) && data.length > 0) {
-    return String(data[0]);
-  }
+    if (parts.length > 0) {
+      return parts.join(" • ");
+    }
 
-  if (typeof data === 'object') {
-    const firstKey = Object.keys(data)[0];
-    if (firstKey) {
-      const val = data[firstKey];
-      if (Array.isArray(val) && val.length > 0) {
-        return `${firstKey}: ${String(val[0])}`;
+    if (data.detail !== undefined && data.detail !== null) {
+      const detailText = formatScalarOrList(data.detail);
+      if (detailText) return detailText;
+    }
+
+    if (Array.isArray(data.non_field_errors) && data.non_field_errors.length > 0) {
+      return formatScalarOrList(data.non_field_errors);
+    }
+
+    const fieldMessages: string[] = [];
+    for (const [key, val] of Object.entries(data)) {
+      if (key === "fund_source") continue;
+      const formatted = formatScalarOrList(val);
+      if (formatted) {
+        fieldMessages.push(`${key}: ${formatted}`);
       }
-      if (typeof val === 'string') {
-        return `${firstKey}: ${val}`;
-      }
+    }
+
+    if (fieldMessages.length > 0) {
+      return fieldMessages.join(" | ");
     }
   }
 
-  return "Failed to save transaction. Please try again.";
+  return `Failed to save transaction (${err?.status || "error"}). Please try again.`;
 }
 
 export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction, onClose, onSave }) => {
