@@ -12,81 +12,116 @@ interface TransactionModalProps {
   onSave: () => void;
 }
 
-function formatScalarOrList(val: any): string {
-  if (Array.isArray(val)) {
-    return val.map((item) => formatScalarOrList(item)).filter(Boolean).join(", ");
-  }
-  if (val && typeof val === "object") {
-    return Object.entries(val)
-      .map(([k, v]) => `${k}: ${formatScalarOrList(v)}`)
-      .filter(Boolean)
-      .join(" | ");
-  }
-  if (val === undefined || val === null || val === "") {
-    return "";
+function formatEuro(val: any): string {
+  const num = Number(val);
+  if (Number.isFinite(num)) {
+    return `€${num.toFixed(2)}`;
   }
   return String(val);
+}
+
+function formatPeriodLabel(fundSource?: string): string {
+  if (!fundSource) return "";
+  const match = fundSource.match(/\((\d{4})-(\d{2})\)/);
+  if (!match) return "";
+  const year = Number(match[1]);
+  const monthIdx = Number(match[2]) - 1;
+  const date = new Date(Date.UTC(year, monthIdx, 1));
+  if (Number.isNaN(date.getTime())) return ` for ${match[1]}-${match[2]}`;
+  const monthName = date.toLocaleString("en-US", { month: "long", timeZone: "UTC" });
+  return ` for ${monthName} ${year}`;
+}
+
+function extractFriendlyText(val: any): string {
+  if (val === undefined || val === null || val === "") return "";
+  if (typeof val === "string") return val.trim();
+  if (typeof val === "number" || typeof val === "boolean") return String(val);
+  if (Array.isArray(val)) {
+    return val.map(extractFriendlyText).filter(Boolean).join(", ");
+  }
+  if (typeof val === "object") {
+    if (typeof val.error === "string") return val.error.trim();
+    if (typeof val.message === "string") return val.message.trim();
+    return Object.entries(val)
+      .filter(([k]) => k !== "fund_source" && k !== "status")
+      .map(([, v]) => extractFriendlyText(v))
+      .filter(Boolean)
+      .join(", ");
+  }
+  return "";
 }
 
 function extractApiErrorMessage(err: any): string {
   const data = err?.data;
 
   if (!data) {
-    const fallback = err?.error || err?.message;
-    return fallback ? String(fallback) : "Failed to save transaction. Please try again.";
+    return "Couldn't save your transaction. Please check your connection and try again.";
   }
 
-  if (typeof data === 'string') {
+  if (typeof data === "string") {
     if (data.trim().startsWith("<")) {
-      return `Server error (${err?.status || "unknown"}). Check backend logs.`;
+      return "We hit a temporary server issue while saving your transaction. Please try again.";
     }
-    return data;
+    return data.trim();
   }
 
-  if (typeof data === 'object') {
-    const parts: string[] = [];
+  if (typeof data === "object") {
+    const errObj =
+      data.errors && typeof data.errors === "object"
+        ? data.errors
+        : data;
 
-    if (data.error !== undefined && data.error !== null) {
-      const errText = formatScalarOrList(data.error);
-      if (errText) parts.push(errText);
+    const rawError = typeof errObj.error === "string" ? errObj.error : "";
+    const available = errObj.available_amount;
+    const requested = errObj.requested_amount;
+    const period = formatPeriodLabel(typeof errObj.fund_source === "string" ? errObj.fund_source : "");
+
+    if (rawError.toLowerCase().includes("insufficient funds")) {
+      const sentence = `Not enough money left in your savings budget${period}.`;
+      const details: string[] = [];
+      if (requested !== undefined) {
+        details.push(`you tried to add ${formatEuro(requested)} extra`);
+      }
+      if (available !== undefined) {
+        details.push(`${formatEuro(available)} available`);
+      }
+      return details.length > 0 ? `${sentence} (${details.join(", ")})` : sentence;
     }
 
-    if (data.available_amount !== undefined) {
-      parts.push(`Available in fund: €${data.available_amount}`);
+    const specificError = extractFriendlyText(errObj.error);
+    if (specificError) {
+      return specificError;
     }
 
-    if (data.requested_amount !== undefined) {
-      parts.push(`Requested additional: €${data.requested_amount}`);
+    if (data.errors && typeof data.errors === "object") {
+      const nestedMsg = extractFriendlyText(data.errors);
+      if (nestedMsg) return nestedMsg;
     }
 
-    if (parts.length > 0) {
-      return parts.join(" • ");
-    }
-
-    if (data.detail !== undefined && data.detail !== null) {
-      const detailText = formatScalarOrList(data.detail);
-      if (detailText) return detailText;
+    if (typeof data.detail === "string" && data.detail.trim()) {
+      return data.detail.trim();
     }
 
     if (Array.isArray(data.non_field_errors) && data.non_field_errors.length > 0) {
-      return formatScalarOrList(data.non_field_errors);
+      return extractFriendlyText(data.non_field_errors);
     }
 
-    const fieldMessages: string[] = [];
-    for (const [key, val] of Object.entries(data)) {
-      if (key === "fund_source") continue;
-      const formatted = formatScalarOrList(val);
-      if (formatted) {
-        fieldMessages.push(`${key}: ${formatted}`);
+    for (const [key, val] of Object.entries(errObj)) {
+      if (["status", "message", "errors", "fund_source", "available_amount", "requested_amount"].includes(key)) {
+        continue;
+      }
+      const fieldMsg = extractFriendlyText(val);
+      if (fieldMsg) {
+        return fieldMsg;
       }
     }
 
-    if (fieldMessages.length > 0) {
-      return fieldMessages.join(" | ");
+    if (typeof data.message === "string" && data.message.trim() && data.message !== "Request processing failed.") {
+      return data.message.trim();
     }
   }
 
-  return `Failed to save transaction (${err?.status || "error"}). Please try again.`;
+  return "Couldn't save your transaction. Please review your details and try again.";
 }
 
 export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction, onClose, onSave }) => {
@@ -137,7 +172,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({ transaction,
       }
     } catch (err) {
       console.error("Failed to parse receipt with AI:", err);
-      setErrorMessage("Failed to parse receipt. Please check the file and try again.");
+      setErrorMessage("Couldn't read that receipt. Please try another image or PDF, or enter the details manually.");
     }
   };
 
