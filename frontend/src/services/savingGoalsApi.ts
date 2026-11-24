@@ -2,9 +2,17 @@
 import { apiSlice } from './api';
 import { type SavingGoal } from '../types/saving-goal';
 
+export interface ContributeSavingGoalPayload {
+  id: number;
+  amount: number;
+  date?: string;
+  description?: string;
+  category_id?: number;
+  create_transaction?: boolean;
+}
+
 export const savingGoalApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    
     // ==================== Saving Goals ====================
     getSavingGoals: builder.query<SavingGoal[], void>({
       query: () => 'saving-goals/',
@@ -34,6 +42,20 @@ export const savingGoalApi = apiSlice.injectEndpoints({
       invalidatesTags: (_result, _error, { id }) => [{ type: 'SavingGoal', id }, 'SavingGoal'],
     }),
 
+    contributeToSavingGoal: builder.mutation<any, ContributeSavingGoalPayload>({
+      query: ({ id, ...body }) => ({
+        url: `saving-goals/${id}/contribute/`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: 'SavingGoal', id },
+        'SavingGoal',
+        'Transaction',
+        'Budget',
+      ],
+    }),
+
     deleteSavingGoal: builder.mutation<number, number>({
       query: (id) => ({
         url: `saving-goals/${id}/`,
@@ -41,7 +63,6 @@ export const savingGoalApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['SavingGoal'],
     }),
-
   }),
 });
 
@@ -50,5 +71,6 @@ export const {
   useGetSavingGoalByIdQuery,
   useAddSavingGoalMutation,
   useUpdateSavingGoalMutation,
+  useContributeToSavingGoalMutation,
   useDeleteSavingGoalMutation,
 } = savingGoalApi;

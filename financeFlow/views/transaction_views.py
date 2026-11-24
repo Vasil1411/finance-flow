@@ -1,6 +1,7 @@
 import json
 from decimal import Decimal
 from datetime import date
+from django.db import transaction as db_transaction
 from django.db.models import Q
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -9,20 +10,21 @@ from rest_framework.permissions import IsAuthenticated
 from financeFlow.models import Transaction, Budget
 from financeFlow.serializers import TransactionSerializer, BudgetSerializer
 from django.conf import settings
-from google import genai   
+from google import genai
 from google.genai import types
+
 
 class TransactionViewSet(viewsets.ModelViewSet):
     serializer_class = TransactionSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Връща транзакциите само на лотнатия потребител
+        # Връща транзакциите само на логнатия потребител
         queryset = Transaction.objects.filter(user=self.request.user)
 
         start_date = self.request.query_params.get('start_date')
         end_date = self.request.query_params.get('end_date')
-        month = self.request.query_params.get('month')  
+        month = self.request.query_params.get('month')
 
         if start_date and end_date:
             queryset = queryset.filter(date__gte=start_date, date__lte=end_date)
@@ -71,23 +73,38 @@ class TransactionViewSet(viewsets.ModelViewSet):
         else:
             serializer.save()
 
+    def perform_destroy(self, instance):
+        with db_transaction.atomic():
+            goal = instance.saving_goal
+            amount = instance.amount or Decimal('0.00')
+            tx_type = instance.type
+
+            super().perform_destroy(instance)
+
+            if goal and tx_type == 'EXPENSE':
+                updated_amount = (goal.current_amount or Decimal('0.00')) - amount
+                goal.current_amount = max(Decimal('0.00'), updated_amount)
+                if goal.target_amount is not None:
+                    goal.is_completed = goal.current_amount >= goal.target_amount
+                goal.save()
+
     @action(detail=False, methods=['POST'], url_path='parse-receipt')
     def parse_receipt(self, request):
         """
         AI-powered receipt parser using optimized multi-model Gemini fallback strategy.
         """
         uploaded_file = request.FILES.get('receipt_file')
-        
+
         if not uploaded_file:
             return Response(
-                {"error": "No file provided. Please upload an image or PDF."}, 
+                {"error": "No file provided. Please upload an image or PDF."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
             file_bytes = uploaded_file.read()
             file_name = uploaded_file.name.lower()
-            
+
             mime_type = "image/jpeg"
             if file_name.endswith('.png'):
                 mime_type = "image/png"
@@ -99,13 +116,13 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 try:
                     from PIL import Image
                     import io
-                    
+
                     img = Image.open(io.BytesIO(file_bytes))
                     img.verify()
-                    
+
                     img = Image.open(io.BytesIO(file_bytes))
-                    img.thumbnail((1280, 1280)) # Смачква огромните снимки от телефон
-                    
+                    img.thumbnail((1280, 1280))  # Смачква огромните снимки от телефон
+
                     output = io.BytesIO()
                     if img.mode in ("RGBA", "P"):
                         img = img.convert("RGB")
@@ -113,11 +130,11 @@ class TransactionViewSet(viewsets.ModelViewSet):
                     file_bytes = output.getvalue()
                     mime_type = "image/jpeg"
                 except Exception:
-                    pass # Ако не успее, праща оригиналния файл
+                    pass  # Ако не успее, праща оригиналния файл
             # ---------------------------------------------------------
 
             api_key = getattr(settings, 'GEMINI_API_KEY', None)
-            
+
             # ТУК Е ФИКСЪТ: Таймаутът се слага при инициализацията на Клиента!
             client = genai.Client(
                 api_key=api_key,
@@ -140,26 +157,25 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 "  * 'name': string (product name)\n"
                 "  * 'price': string (final price paid for the item)\n"
                 "  * 'discount': string or null (the discount amount or percentage applied to this item, if explicitly written on the receipt; otherwise null or '0')\n"
-                "  * 'quantity': number (quantity of the item, default to 1 if not specified)." )
+                "  * 'quantity': number (quantity of the item, default to 1 if not specified)."
+            )
 
             models_to_try = [
                 'gemini-2.5-flash-lite',
-                'gemini-3.1-flash-lite',  # Най-новият и мощен Flash модел
-                'gemini-3.8-flash',       # Най-новият и мощен Flash модел
-                'gemini-3.7-flash',       # Предходен надежден Flash модел
-                'gemini-3.6-flash',       # Работен кон от предишни поколения
-                'gemini-3.5-flash',       # Стабилен бърз модел
-                'gemini-3.5-flash-lite',  # Ултра бърз и лек модел
-                # Икономичен и ефективен
-                'gemini-4-argon'          # Флагмански модел с дълбоко мислене (поставяме го най-накрая като тежък резервен вариант)
+                'gemini-3.1-flash-lite',
+                'gemini-3.8-flash',
+                'gemini-3.7-flash',
+                'gemini-3.6-flash',
+                'gemini-3.5-flash',
+                'gemini-3.5-flash-lite',
+                'gemini-4-argon'
             ]
-            
+
             raw_response_text = None
             last_error = None
 
             for model_name in models_to_try:
                 try:
-                    # МАХНАТ Е http_options от тук, за да не чупи заявката
                     response = client.models.generate_content(
                         model=model_name,
                         contents=[image_part, prompt],
@@ -171,7 +187,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
                     )
                     if response and response.text:
                         raw_response_text = response.text
-                        break  
+                        break
                 except Exception as model_err:
                     last_error = model_err
                     continue
@@ -189,6 +205,6 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 {
                     "error": "AI parsing failed.",
                     "details": str(e)
-                }, 
+                },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
             )

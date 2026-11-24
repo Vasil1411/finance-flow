@@ -3,35 +3,56 @@ import { Button } from '../components/UI';
 import { SavingGoalCard } from '../components/SavingGoalCard';
 import {
   useGetSavingGoalsQuery,
-  useUpdateSavingGoalMutation,
+  useContributeToSavingGoalMutation,
   useDeleteSavingGoalMutation,
 } from '../services/savingGoalsApi';
 import { SavingGoalModal } from '../components/SavingGoalModal';
 import type { SavingGoal } from '../types/saving-goal';
 
+interface FundErrorModalState {
+  message: string;
+  availableAmount?: string;
+  requestedAmount?: string;
+  goalName?: string;
+}
+
 export const GoalsView: React.FC = () => {
-  const { data: goals = [], isLoading, error, refetch } = useGetSavingGoalsQuery();
-  const [updateSavingGoal] = useUpdateSavingGoalMutation();
+  const { data: goals = [], isLoading, error, refetch } = useGetSavingGoalsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
+  const [contributeToSavingGoal] = useContributeToSavingGoalMutation();
   const [deleteSavingGoal] = useDeleteSavingGoalMutation();
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<SavingGoal | null>(null);
+  const [fundErrorModal, setFundErrorModal] = useState<FundErrorModalState | null>(null);
 
   const handleDeposit = async (goal: SavingGoal, addValue: number) => {
-    const current = Number(goal.current_amount);
-    const target = Number(goal.target_amount);
-    const newCurrent = current + addValue;
+    if (addValue <= 0) return;
 
     try {
-      await updateSavingGoal({
+      await contributeToSavingGoal({
         id: goal.id,
-        data: {
-          ...goal,
-          current_amount: newCurrent > target ? target : newCurrent,
-        },
+        amount: addValue,
+        create_transaction: true,
       }).unwrap();
-    } catch (err) {
+      refetch();
+    } catch (err: any) {
+      const apiError = err?.data;
+      if (err?.status === 400 && apiError) {
+        setFundErrorModal({
+          message: apiError.error || 'Insufficient funds in savings fund.',
+          availableAmount: apiError.available_amount,
+          requestedAmount: apiError.requested_amount,
+          goalName: goal.name,
+        });
+      } else {
+        setFundErrorModal({
+          message: 'Failed to deposit funds. Please try again.',
+          goalName: goal.name,
+        });
+      }
       console.error('Failed to deposit funds:', err);
     }
   };
@@ -94,6 +115,43 @@ export const GoalsView: React.FC = () => {
           onClose={() => setIsModalOpen(false)}
           onSave={() => refetch()}
         />
+      )}
+
+      {fundErrorModal && (
+        <div className="modal-backdrop" onMouseDown={() => setFundErrorModal(null)}>
+          <div
+            className="modal"
+            style={{ maxWidth: '420px', padding: '24px' }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="modal-head" style={{ marginBottom: '12px' }}>
+              <div>
+                <span className="eyebrow" style={{ color: '#D95E44' }}>
+                  SAVINGS FUND LIMIT
+                </span>
+                <h2>Cannot add deposit</h2>
+                <p style={{ marginTop: '8px', color: '#475467', lineHeight: 1.5 }}>
+                  {fundErrorModal.message}
+                  {fundErrorModal.goalName ? ` (Goal: ${fundErrorModal.goalName})` : ''}
+                </p>
+                {fundErrorModal.availableAmount !== undefined && (
+                  <p style={{ marginTop: '8px', fontWeight: 600, color: '#1D2939' }}>
+                    Available in fund: €{fundErrorModal.availableAmount}
+                    {fundErrorModal.requestedAmount ? ` • Requested: €${fundErrorModal.requestedAmount}` : ''}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div
+              className="modal-actions"
+              style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}
+            >
+              <Button onClick={() => setFundErrorModal(null)} type="button">
+                Got it
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

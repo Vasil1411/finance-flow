@@ -5,7 +5,7 @@ import { BudgetRuleCard } from '../components/BudgetRuleCard';
 import { MonthPicker, formatMonthLabel } from '../components/MonthPicker';
 import { Icon } from '../components/Icon';
 import { useGetTransactionsQuery } from '../services/transactionsApi';
-import { useGetBudgetsQuery } from '../services/budgetsApi';
+import { useGetBudgetsQuery, useGetBudgetSummaryQuery } from '../services/budgetsApi';
 import { useGetCategoriesQuery } from '../services/categoriesApi';
 import { useGetSavingGoalsQuery } from '../services/savingGoalsApi';
 
@@ -27,6 +27,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
   const { data: budgets = [] } = useGetBudgetsQuery();
   const { data: categories = [] } = useGetCategoriesQuery();
   const { data: goals = [] } = useGetSavingGoalsQuery();
+  const { data: summary } = useGetBudgetSummaryQuery(currentDate, {
+    refetchOnMountOrArgChange: true,
+  });
 
   const monthTransactions = useMemo(() => {
     return transactions.filter((t: any) => t.date && t.date.startsWith(currentDate));
@@ -36,27 +39,53 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
     return budgets.filter((b: any) => b.month && b.month.startsWith(currentDate));
   }, [budgets, currentDate]);
 
-  const totalIncome = monthTransactions
-    .filter((t: any) => t.type?.toUpperCase() === 'INCOME')
-    .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0);
+  // Мигновено изчисление от транзакциите в стейта/кеша, за да реагира веднага при промяна
+  const totalIncome = useMemo(() => {
+    return monthTransactions
+      .filter((t: any) => t.type?.toUpperCase() === 'INCOME')
+      .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0);
+  }, [monthTransactions]);
 
-  const totalExpense = monthTransactions
-    .filter((t: any) => t.type?.toUpperCase() === 'EXPENSE')
-    .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0);
+  const totalExpense = useMemo(() => {
+    return monthTransactions
+      .filter((t: any) => t.type?.toUpperCase() === 'EXPENSE')
+      .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0);
+  }, [monthTransactions]);
 
   const totalBalance = totalIncome - totalExpense;
 
   const groupAllocations = useMemo(() => {
+    if (summary?.rule_50_30_20) {
+      const { needs, wants, savings } = summary.rule_50_30_20;
+      return {
+        Needs: {
+          allocated: Number(needs.amount || 0),
+          target: totalIncome * 0.5,
+          actualPercent: needs.actual_percentage_of_income,
+        },
+        Wants: {
+          allocated: Number(wants.amount || 0),
+          target: totalIncome * 0.3,
+          actualPercent: wants.actual_percentage_of_income,
+        },
+        Savings: {
+          allocated: Number(savings.amount || 0),
+          target: totalIncome * 0.2,
+          actualPercent: savings.actual_percentage_of_income,
+        },
+      };
+    }
+
     const groups = {
-      Needs: { allocated: 0, target: totalIncome * 0.5 },
-      Wants: { allocated: 0, target: totalIncome * 0.3 },
-      Savings: { allocated: 0, target: totalIncome * 0.2 },
+      Needs: { allocated: 0, target: totalIncome * 0.5, actualPercent: 0 },
+      Wants: { allocated: 0, target: totalIncome * 0.3, actualPercent: 0 },
+      Savings: { allocated: 0, target: totalIncome * 0.2, actualPercent: 0 },
     };
 
     monthBudgets.forEach((b: any) => {
       const cat = categories.find((c: any) => c.id === b.category);
       if (!cat) return;
-      const alloc = (cat.allocation_type || "").toUpperCase();
+      const alloc = (cat.allocation_type || '').toUpperCase();
       const amount = Number(b.amount || 0);
 
       if (alloc.includes('NEED')) {
@@ -69,11 +98,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
     });
 
     return groups;
-  }, [monthBudgets, categories, totalIncome]);
+  }, [summary, monthBudgets, categories, totalIncome]);
 
   const totalBudgetAllocated =
-    groupAllocations.Needs.allocated + groupAllocations.Wants.allocated + groupAllocations.Savings.allocated;
-  const plannedPercent = totalIncome > 0 ? Math.min(Math.round((totalBudgetAllocated / totalIncome) * 100), 100) : 0;
+    summary?.totals?.total_budgeted !== undefined
+      ? Number(summary.totals.total_budgeted)
+      : groupAllocations.Needs.allocated +
+        groupAllocations.Wants.allocated +
+        groupAllocations.Savings.allocated;
+
+  const plannedPercent =
+    totalIncome > 0 ? Math.min(Math.round((totalBudgetAllocated / totalIncome) * 100), 100) : 0;
 
   return (
     <>
@@ -88,7 +123,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
         <StatCard
           label="Net Balance"
           amount={`€${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          trend={totalBalance >= 0 ? "Positive" : "Negative"}
+          trend={totalBalance >= 0 ? 'Positive' : 'Negative'}
           icon="wallet"
           color="#526DE2"
           bg="#EDF0FF"
@@ -118,7 +153,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
           totalIncome={totalIncome}
           plannedPercent={plannedPercent}
           groupAllocations={groupAllocations}
-          onOpenBudgets={() => setPage("budgets")}
+          onOpenBudgets={() => setPage('budgets')}
         />
 
         <div className="card spending-card">
@@ -133,7 +168,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
           </div>
           <div className="spend-total">
             <span>Total spent</span>
-            <strong>€{totalExpense.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+            <strong>
+              €{totalExpense.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </strong>
             <small>
               <b>Active budgets:</b> {monthBudgets.length} | <b>Goals:</b> {goals.length}
             </small>
@@ -141,8 +178,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
           <div className="spend-chart">
             {[45, 68, 52, 78, 62, 88, 59].map((h, i) => (
               <div key={i}>
-                <i style={{ height: `${h}%` }} className={i === 5 ? "active" : ""} />
-                <span>{["M", "T", "W", "T", "F", "S", "S"][i]}</span>
+                <i style={{ height: `${h}%` }} className={i === 5 ? 'active' : ''} />
+                <span>{['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]}</span>
               </div>
             ))}
           </div>
@@ -155,7 +192,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
             <h2>Recent transactions</h2>
             <p>Latest activity for {formattedMonthLabel}.</p>
           </div>
-          <button className="text-btn" onClick={() => setPage("transactions")} type="button">
+          <button className="text-btn" onClick={() => setPage('transactions')} type="button">
             View all <Icon name="chevron" size={15} />
           </button>
         </div>

@@ -3,7 +3,6 @@ import { type Transaction } from '../types/transaction';
 
 export const transactionApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    
     // ==================== Transactions ====================
     getTransactions: builder.query<Transaction[], void>({
       query: () => 'transactions/',
@@ -19,10 +18,9 @@ export const transactionApi = apiSlice.injectEndpoints({
       query: (newTransaction) => ({
         url: 'transactions/',
         method: 'POST',
-        // Ако подаваме FormData (заради receipt_file), fetch автоматично задава правилния multipart/form-data хедър
         body: newTransaction,
       }),
-      invalidatesTags: ['Transaction'],
+      invalidatesTags: ['Transaction', 'Budget'],
     }),
 
     updateTransaction: builder.mutation<Transaction, { id: number; data: Partial<Transaction> | FormData }>({
@@ -31,7 +29,11 @@ export const transactionApi = apiSlice.injectEndpoints({
         method: 'PUT',
         body: data,
       }),
-      invalidatesTags: (_result, _error, { id }) => [{ type: 'Transaction', id }, 'Transaction'],
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: 'Transaction', id },
+        'Transaction',
+        'Budget',
+      ],
     }),
 
     deleteTransaction: builder.mutation<number, number>({
@@ -39,7 +41,7 @@ export const transactionApi = apiSlice.injectEndpoints({
         url: `transactions/${id}/`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['Transaction'],
+      invalidatesTags: ['Transaction', 'Budget', 'SavingGoal'],
     }),
 
     // 🧾 Нов ендпойнт за AI сканиране на касови бележки и фактури
@@ -54,9 +56,8 @@ export const transactionApi = apiSlice.injectEndpoints({
         };
       },
     }),
-    
-  }), 
-}); 
+  }),
+});
 
 export const {
   useGetTransactionsQuery,
@@ -64,5 +65,5 @@ export const {
   useAddTransactionMutation,
   useUpdateTransactionMutation,
   useDeleteTransactionMutation,
-  useParseReceiptMutation, // Извличаме новия hook
+  useParseReceiptMutation,
 } = transactionApi;
