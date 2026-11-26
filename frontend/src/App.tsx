@@ -7,6 +7,7 @@ import { TransactionsView } from './views/TransactionsView';
 import { BudgetsView } from './views/BudgetsView';
 import { GoalsView } from './views/GoalsView';
 import { AdminView } from './views/AdminView';
+import { AnalyticsView } from './views/AnalyticsView';
 import { Shell } from './components/Shell';
 import { TransactionModal } from './components/TransactionModal';
 import { useState } from 'react';
@@ -52,6 +53,7 @@ const AuthenticatedApp = ({ onLogout }: { onLogout: () => void }) => {
             <Route path="/transactions" element={<TransactionsView openModal={(t) => setModal({ open: true, transaction: t })} />} />
             <Route path="/budgets" element={<BudgetsView />} />
             <Route path="/goals" element={<GoalsView />} />
+            <Route path="/analytics" element={<AnalyticsView />} />
             
             <Route 
               path="/admin" 

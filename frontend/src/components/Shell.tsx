@@ -28,6 +28,7 @@ export const Shell: React.FC<ShellProps> = ({ page, setPage, onLogout, children 
     { id: "transactions", label: "Transactions", icon: "swap" },
     { id: "budgets", label: "Budgets & categories", icon: "wallet" },
     { id: "goals", label: "Saving goals", icon: "target" },
+    { id: "analytics", label: "Analytics", icon: "arrowUp" }
   ];
 
   // Ако е админ, добавяме и "Admin Panel" в менюто
@@ -40,7 +41,8 @@ export const Shell: React.FC<ShellProps> = ({ page, setPage, onLogout, children 
     transactions: ["Transactions", "View and manage all your income and expenses."],
     budgets: ["Budgets & categories", "Stay on track with your monthly spending plan."],
     goals: ["Saving goals", "Turn your plans into progress, one deposit at a time."],
-    admin: ["System Admin", "Monitor platform metrics and registered users."], // 👈 Заглавие за админ страницата
+    admin: ["System Admin", "Monitor platform metrics and registered users."], 
+    analytics: ["Analytics", "Monthly trends, receipt item insights, and CSV/JSON export."],
   };
 
   return (
