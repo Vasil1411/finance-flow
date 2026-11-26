@@ -24,12 +24,56 @@ def _parse_year_month(date_str: str):
     return year_int, month_int, f"{year_int:04d}-{month_int:02d}"
 
 
+def _calculate_all_time_reserve(user):
+    """
+    Изчислява свободния натрупан резерв (All-Time) от всички приходи минус всички разходи,
+    както и общата сума, вече разпределена в спестовни цели.
+    """
+    total_income = (
+        Transaction.objects.filter(user=user, type='INCOME')
+        .aggregate(total=Sum('amount'))['total']
+        or Decimal('0.00')
+    )
+    total_expenses = (
+        Transaction.objects.filter(user=user, type='EXPENSE')
+        .aggregate(total=Sum('amount'))['total']
+        or Decimal('0.00')
+    )
+    allocated_in_goals = (
+        SavingGoal.objects.filter(user=user)
+        .aggregate(total=Sum('current_amount'))['total']
+        or Decimal('0.00')
+    )
+    free_reserve = total_income - total_expenses
+    return {
+        "total_income_all_time": total_income,
+        "total_expenses_all_time": total_expenses,
+        "free_reserve": free_reserve,
+        "allocated_in_goals": allocated_in_goals,
+        "total_wealth_with_goals": free_reserve + allocated_in_goals,
+    }
+
+
 class SavingGoalViewSet(viewsets.ModelViewSet):
     serializer_class = SavingGoalSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         return SavingGoal.objects.filter(user=self.request.user)
+
+    @action(detail=False, methods=['GET'], url_path='reserve-summary')
+    def reserve_summary(self, request):
+        stats = _calculate_all_time_reserve(request.user)
+        return Response(
+            {
+                "free_reserve": f"{stats['free_reserve']:.2f}",
+                "allocated_in_goals": f"{stats['allocated_in_goals']:.2f}",
+                "total_wealth_with_goals": f"{stats['total_wealth_with_goals']:.2f}",
+                "total_income_all_time": f"{stats['total_income_all_time']:.2f}",
+                "total_expenses_all_time": f"{stats['total_expenses_all_time']:.2f}",
+            },
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=True, methods=['POST'], url_path='contribute')
     def contribute(self, request, pk=None):
@@ -69,6 +113,10 @@ class SavingGoalViewSet(viewsets.ModelViewSet):
         if isinstance(force_override, str):
             force_override = force_override.lower() in ('true', '1', 'yes')
 
+        use_reserve = request.data.get('use_reserve', False)
+        if isinstance(use_reserve, str):
+            use_reserve = use_reserve.lower() in ('true', '1', 'yes')
+
         category_id = request.data.get('category_id')
         if category_id:
             savings_category = Category.objects.filter(
@@ -91,7 +139,6 @@ class SavingGoalViewSet(viewsets.ModelViewSet):
         created_transaction = None
 
         with db_transaction.atomic():
-            # Заключваме целевия SavingGoal ред при конкурентни заявки
             goal = (
                 SavingGoal.objects.select_for_update()
                 .filter(pk=goal_lookup.pk, user=request.user)
@@ -103,10 +150,12 @@ class SavingGoalViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            available_in_fund = None
+            reserve_stats = _calculate_all_time_reserve(request.user)
+            all_time_reserve = reserve_stats["free_reserve"]
+
+            available_in_monthly_fund = None
             fund_source = None
 
-            # Проверка за наличност във фонда (месечен бюджет за SAVINGS категорията, ако има)
             if savings_category:
                 monthly_budget = (
                     Budget.objects.select_for_update()
@@ -130,36 +179,66 @@ class SavingGoalViewSet(viewsets.ModelViewSet):
                         ).aggregate(total=Sum('amount'))['total']
                         or Decimal('0.00')
                     )
-                    available_in_fund = (monthly_budget.amount or Decimal('0.00')) - spent_in_fund
+                    available_in_monthly_fund = max(
+                        Decimal('0.00'),
+                        (monthly_budget.amount or Decimal('0.00')) - spent_in_fund,
+                    )
                     fund_source = f"monthly_budget:{savings_category.name}({month_prefix})"
 
-            # Ако няма зададен месечен бюджет за фонда, проверяваме общия нетен баланс
-            if available_in_fund is None:
-                total_income = (
-                    Transaction.objects.filter(user=request.user, type='INCOME')
-                    .aggregate(total=Sum('amount'))['total']
-                    or Decimal('0.00')
-                )
-                total_expenses = (
-                    Transaction.objects.filter(user=request.user, type='EXPENSE')
-                    .aggregate(total=Sum('amount'))['total']
-                    or Decimal('0.00')
-                )
-                available_in_fund = total_income - total_expenses
-                fund_source = "overall_net_balance"
+            # 1. Потребителят изрично избира да тегли от All-Time резерва
+            if use_reserve:
+                if amount > all_time_reserve and not force_override:
+                    return Response(
+                        {
+                            "error": "Insufficient funds in your All-Time savings reserve.",
+                            "fund_source": "all_time_reserve",
+                            "requested_amount": f"{amount:.2f}",
+                            "available_amount": f"{max(Decimal('0.00'), all_time_reserve):.2f}",
+                            "can_use_reserve": False,
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                fund_source = "all_time_reserve"
+                if "[From All-Time Reserve]" not in description:
+                    description = f"{description} [From All-Time Reserve]"
+                remaining_after = all_time_reserve - amount
 
-            if amount > available_in_fund and not force_override:
-                return Response(
-                    {
-                        "error": "Insufficient funds in savings fund.",
-                        "fund_source": fund_source,
-                        "requested_amount": f"{amount:.2f}",
-                        "available_amount": f"{available_in_fund:.2f}",
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            # 2. Стандартен поток: проверка на месечния SAVINGS бюджет (ако съществува)
+            elif available_in_monthly_fund is not None:
+                if amount > available_in_monthly_fund and not force_override:
+                    can_cover_from_reserve = amount <= all_time_reserve
+                    return Response(
+                        {
+                            "error": "Insufficient funds in savings fund.",
+                            "fund_source": fund_source,
+                            "requested_amount": f"{amount:.2f}",
+                            "available_amount": f"{available_in_monthly_fund:.2f}",
+                            "reserve_available": f"{max(Decimal('0.00'), all_time_reserve):.2f}",
+                            "can_use_reserve": can_cover_from_reserve,
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                remaining_after = available_in_monthly_fund - amount
+
+            # 3. Няма месечен бюджет -> проверяваме директно All-Time резерва
+            else:
+                fund_source = "all_time_reserve"
+                if amount > all_time_reserve and not force_override:
+                    return Response(
+                        {
+                            "error": "Insufficient funds in your All-Time savings reserve.",
+                            "fund_source": fund_source,
+                            "requested_amount": f"{amount:.2f}",
+                            "available_amount": f"{max(Decimal('0.00'), all_time_reserve):.2f}",
+                            "can_use_reserve": False,
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                remaining_after = all_time_reserve - amount
 
             goal.current_amount = (goal.current_amount or Decimal('0.00')) + amount
+            if goal.target_amount and goal.current_amount >= goal.target_amount:
+                goal.is_completed = True
             goal.save()
 
             if create_tx:
@@ -173,12 +252,15 @@ class SavingGoalViewSet(viewsets.ModelViewSet):
                     description=description,
                 )
 
+        updated_reserve = _calculate_all_time_reserve(request.user)
+
         return Response(
             {
                 "goal": SavingGoalSerializer(goal, context={'request': request}).data,
                 "contribution_amount": f"{amount:.2f}",
                 "fund_source": fund_source,
-                "remaining_fund_after": f"{(available_in_fund - amount):.2f}",
+                "remaining_fund_after": f"{remaining_after:.2f}",
+                "reserve_remaining": f"{updated_reserve['free_reserve']:.2f}",
                 "savings_category_used": savings_category.name if savings_category else None,
                 "transaction": (
                     TransactionSerializer(created_transaction, context={'request': request}).data
