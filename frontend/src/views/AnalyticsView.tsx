@@ -1,8 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Button } from '../components/UI';
 import { Icon } from '../components/Icon';
 import { useGetTransactionsQuery } from '../services/transactionsApi';
-import { useGetCategoriesQuery } from '../services/categoriesApi';
+
 
 interface MonthlyPoint {
   monthKey: string; // YYYY-MM
@@ -40,22 +39,10 @@ function formatEuro(val: number): string {
   })}`;
 }
 
-function downloadCsvFile(content: string, filename: string) {
-  const blob = new Blob([`\uFEFF${content}`], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('download', filename);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-}
+
 
 export const AnalyticsView: React.FC = () => {
   const { data: transactions = [], isLoading, error } = useGetTransactionsQuery();
-  const { data: categories = [] } = useGetCategoriesQuery();
-
   const [selectedYear, setSelectedYear] = useState<string>(() => String(new Date().getFullYear()));
   const [itemSearch, setItemSearch] = useState<string>('');
   const [exportScope, setExportScope] = useState<'year' | 'all'>('year');
@@ -172,31 +159,7 @@ export const AnalyticsView: React.FC = () => {
     return list.filter((i) => i.name.toLowerCase().includes(q));
   }, [yearTransactions, itemSearch]);
 
-  const handleExportCsv = () => {
-    const rowsToExport = exportScope === 'year' ? yearTransactions : transactions;
-    const suffix = exportScope === 'year' ? selectedYear : 'all-time';
-
-    const headers = ['id', 'date', 'type', 'category_name', 'amount', 'description'];
-    const escapeCsv = (val: any) => {
-      const str = val === undefined || val === null ? '' : String(val);
-      return `"${str.replace(/"/g, '""')}"`;
-    };
-
-    const csvLines = [
-      headers.join(','),
-      ...rowsToExport.map((t: any) => {
-        const catName =
-          t.category_name ||
-          categories.find((c: any) => c.id === t.category)?.name ||
-          '';
-        return [t.id, t.date, t.type, catName, t.amount, t.description || '']
-          .map(escapeCsv)
-          .join(',');
-      }),
-    ];
-
-    downloadCsvFile(csvLines.join('\n'), `financeflow-transactions-${suffix}.csv`);
-  };
+ 
 
   if (isLoading) {
     return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading analytics...</div>;
