@@ -280,9 +280,9 @@ export const AnalyticsView: React.FC = () => {
           </label>
         </div>
 
-        <Button variant="secondary" onClick={handleExportCsv} type="button">
+        {/* <Button variant="secondary" onClick={handleExportCsv} type="button">
           Export CSV
-        </Button>
+        </Button> */}
       </div>
 
       {/* Годишна крива на разходите по месеци */}
