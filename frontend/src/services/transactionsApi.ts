@@ -1,11 +1,23 @@
 import { apiSlice } from './api';
-import { type Transaction } from '../types/transaction';
+import { type Transaction, type TransactionQueryParams } from '../types/transaction';
 
 export const transactionApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // ==================== Transactions ====================
-    getTransactions: builder.query<Transaction[], void>({
-      query: () => 'transactions/',
+    getTransactions: builder.query<Transaction[], TransactionQueryParams | void>({
+      query: (params) => {
+        if (!params) {
+          return 'transactions/';
+        }
+        const searchParams = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            searchParams.set(key, String(value));
+          }
+        });
+        const qs = searchParams.toString();
+        return qs ? `transactions/?${qs}` : 'transactions/';
+      },
       providesTags: ['Transaction'],
     }),
 

@@ -20,3 +20,12 @@ export interface Transaction {
   created_at?: string;
   items?: any;
 }
+
+export interface TransactionQueryParams {
+  year?: string | number;
+  month?: string;
+  start_date?: string;
+  end_date?: string;
+  category?: number | string;
+  type?: TransactionType | 'ALL';
+}

@@ -1,8 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { StatCard } from '../components/StatCard';
 import { TransactionRows } from '../components/TransactionRows';
 import { BudgetRuleCard } from '../components/BudgetRuleCard';
-import { MonthPicker, formatMonthLabel } from '../components/MonthPicker';
+import { DashboardPeriodBar } from '../components/DashboardPeriodBar';
+import { YearlyOverviewBanner } from '../components/YearlyOverviewBanner';
+import { formatMonthLabel } from '../components/MonthPicker';
 import { Icon } from '../components/Icon';
 import { useGetTransactionsQuery } from '../services/transactionsApi';
 import { useGetBudgetsQuery, useGetBudgetSummaryQuery } from '../services/budgetsApi';
@@ -21,6 +23,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
     return `${year}-${month}`;
   });
 
+  const [selectedYear, setSelectedYear] = useState<string>(() => currentDate.slice(0, 4));
+
+  useEffect(() => {
+    const yearFromMonth = currentDate.slice(0, 4);
+    if (yearFromMonth) {
+      setSelectedYear(yearFromMonth);
+    }
+  }, [currentDate]);
+
   const formattedMonthLabel = formatMonthLabel(currentDate);
 
   const { data: transactions = [], isLoading: loadingTx } = useGetTransactionsQuery();
@@ -31,15 +42,34 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
     refetchOnMountOrArgChange: true,
   });
 
+  const availableYears = useMemo(() => {
+    const yearsSet = new Set<string>([String(new Date().getFullYear()), selectedYear]);
+    transactions.forEach((t: any) => {
+      if (typeof t.date === 'string' && t.date.length >= 4) {
+        yearsSet.add(t.date.slice(0, 4));
+      }
+    });
+    return Array.from(yearsSet).sort((a, b) => Number(b) - Number(a));
+  }, [transactions, selectedYear]);
+
+  const handleYearChange = (nextYear: string) => {
+    setSelectedYear(nextYear);
+    const currentMonthPart = currentDate.slice(5, 7) || '01';
+    setCurrentDate(`${nextYear}-${currentMonthPart}`);
+  };
+
   const monthTransactions = useMemo(() => {
     return transactions.filter((t: any) => t.date && t.date.startsWith(currentDate));
   }, [transactions, currentDate]);
+
+  const yearTransactions = useMemo(() => {
+    return transactions.filter((t: any) => t.date && t.date.startsWith(`${selectedYear}-`));
+  }, [transactions, selectedYear]);
 
   const monthBudgets = useMemo(() => {
     return budgets.filter((b: any) => b.month && b.month.startsWith(currentDate));
   }, [budgets, currentDate]);
 
-  // Мигновено изчисление от транзакциите в стейта/кеша, за да реагира веднага при промяна
   const totalIncome = useMemo(() => {
     return monthTransactions
       .filter((t: any) => t.type?.toUpperCase() === 'INCOME')
@@ -51,6 +81,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
       .filter((t: any) => t.type?.toUpperCase() === 'EXPENSE')
       .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0);
   }, [monthTransactions]);
+
+  const yearlyStats = useMemo(() => {
+    let income = 0;
+    let expense = 0;
+    let expenseCount = 0;
+
+    yearTransactions.forEach((t: any) => {
+      const txType = t.type?.toUpperCase();
+      const amt = Number(t.amount || 0);
+      if (txType === 'INCOME') {
+        income += amt;
+      } else if (txType === 'EXPENSE') {
+        expense += amt;
+        expenseCount += 1;
+      }
+    });
+
+    return { income, expense, expenseCount };
+  }, [yearTransactions]);
 
   const totalBalance = totalIncome - totalExpense;
 
@@ -112,12 +161,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
 
   return (
     <>
-      <div
-        className="section-actions"
-        style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '24px' }}
-      >
-        <MonthPicker currentDate={currentDate} onChange={setCurrentDate} variant="default" />
-      </div>
+      <DashboardPeriodBar
+        currentDate={currentDate}
+        formattedMonthLabel={formattedMonthLabel}
+        selectedYear={selectedYear}
+        availableYears={availableYears}
+        onChangeMonth={setCurrentDate}
+        onChangeYear={handleYearChange}
+      />
 
       <section className="stats-grid">
         <StatCard
@@ -145,6 +196,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setPage }) => {
           bg="#FFF0EA"
         />
       </section>
+
+      <YearlyOverviewBanner
+        year={selectedYear}
+        yearlyIncome={yearlyStats.income}
+        yearlyExpense={yearlyStats.expense}
+        expenseCount={yearlyStats.expenseCount}
+      />
 
       <section className="dashboard-grid">
         <BudgetRuleCard
