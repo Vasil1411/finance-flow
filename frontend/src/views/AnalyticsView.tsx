@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { Icon } from '../components/Icon';
 import { useGetTransactionsQuery } from '../services/transactionsApi';
 
-
 interface MonthlyPoint {
   monthKey: string; // YYYY-MM
   label: string;    // Jan, Feb...
@@ -38,8 +37,6 @@ function formatEuro(val: number): string {
     maximumFractionDigits: 2,
   })}`;
 }
-
-
 
 export const AnalyticsView: React.FC = () => {
   const { data: transactions = [], isLoading, error } = useGetTransactionsQuery();
@@ -159,8 +156,6 @@ export const AnalyticsView: React.FC = () => {
     return list.filter((i) => i.name.toLowerCase().includes(q));
   }, [yearTransactions, itemSearch]);
 
- 
-
   if (isLoading) {
     return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading analytics...</div>;
   }
@@ -175,7 +170,7 @@ export const AnalyticsView: React.FC = () => {
   return (
     <>
       <div
-        className="section-actions"
+        className="section-actions analytics-toolbar"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -185,7 +180,7 @@ export const AnalyticsView: React.FC = () => {
           marginBottom: '20px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        <div className="analytics-controls" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', color: '#475467' }}>
             <span>Year:</span>
             <select
@@ -242,14 +237,10 @@ export const AnalyticsView: React.FC = () => {
             <span>Active months only</span>
           </label>
         </div>
-
-        {/* <Button variant="secondary" onClick={handleExportCsv} type="button">
-          Export CSV
-        </Button> */}
       </div>
 
       {/* Годишна крива на разходите по месеци */}
-      <section className="card" style={{ marginBottom: '20px', padding: '20px' }}>
+      <section className="card analytics-card" style={{ marginBottom: '20px', padding: '20px' }}>
         <div className="card-heading" style={{ marginBottom: '16px' }}>
           <div>
             <span className="eyebrow">MONTHLY CURVE · {selectedYear}</span>
@@ -261,60 +252,43 @@ export const AnalyticsView: React.FC = () => {
           </div>
         </div>
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
-            gap: '8px',
-            alignItems: 'end',
-            height: '175px',
-            paddingTop: '16px',
-            borderBottom: '1px solid #EAECF0',
-          }}
-        >
-          {monthlySeries.map((m) => {
-            const heightPct = m.expense > 0 ? Math.max(Math.round((m.expense / maxMonthlyExpense) * 100), 8) : 2;
-            return (
-              <div
-                key={m.monthKey}
-                title={`${m.label} ${selectedYear}: ${formatEuro(m.expense)}`}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  height: '100%',
-                  justifyContent: 'flex-end',
-                  gap: '6px',
-                }}
-              >
-                <span style={{ fontSize: '0.7rem', color: m.expense > 0 ? '#344054' : '#98A2B3' }}>
-                  {m.expense > 0 ? formatEuro(m.expense) : '—'}
-                </span>
+        <div className="analytics-chart-scroll">
+          <div className="analytics-months-grid">
+            {monthlySeries.map((m) => {
+              const heightPct = m.expense > 0 ? Math.max(Math.round((m.expense / maxMonthlyExpense) * 100), 8) : 2;
+              return (
                 <div
-                  style={{
-                    width: '100%',
-                    maxWidth: '28px',
-                    height: `${heightPct}%`,
-                    background: m.expense > 0 ? '#526DE2' : '#E4E7EC',
-                    borderRadius: '6px 6px 0 0',
-                  }}
-                />
-                <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#344054' }}>{m.label}</span>
-              </div>
-            );
-          })}
+                  key={m.monthKey}
+                  className="analytics-month-col"
+                  title={`${m.label} ${selectedYear}: ${formatEuro(m.expense)}`}
+                >
+                  <span className="analytics-month-val" style={{ color: m.expense > 0 ? '#344054' : '#98A2B3' }}>
+                    {m.expense > 0 ? formatEuro(m.expense) : '—'}
+                  </span>
+                  <div
+                    className="analytics-month-bar"
+                    style={{
+                      height: `${heightPct}%`,
+                      background: m.expense > 0 ? '#526DE2' : '#E4E7EC',
+                    }}
+                  />
+                  <span className="analytics-month-label">{m.label}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* MoM таблица */}
-        <div style={{ overflowX: 'auto', marginTop: '18px' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+        <div className="analytics-table-wrap">
+          <table className="analytics-table">
             <thead>
-              <tr style={{ textAlign: 'left', borderBottom: '1px solid #EAECF0', color: '#667085' }}>
-                <th style={{ padding: '8px 10px' }}>Month</th>
-                <th style={{ padding: '8px 10px' }}>Income</th>
-                <th style={{ padding: '8px 10px' }}>Expenses</th>
-                <th style={{ padding: '8px 10px' }}>MoM Change (Expenses)</th>
-                <th style={{ padding: '8px 10px' }}>Net</th>
+              <tr>
+                <th>Month</th>
+                <th>Income</th>
+                <th>Expenses</th>
+                <th>MoM Change (Expenses)</th>
+                <th>Net</th>
               </tr>
             </thead>
             <tbody>
@@ -350,18 +324,14 @@ export const AnalyticsView: React.FC = () => {
                   }
 
                   return (
-                    <tr key={m.monthKey} style={{ borderBottom: '1px solid #F2F4F7' }}>
-                      <td style={{ padding: '8px 10px', fontWeight: 500, color: '#101828' }}>
+                    <tr key={m.monthKey}>
+                      <td style={{ fontWeight: 500, color: '#101828' }}>
                         {m.label} {selectedYear}
                       </td>
-                      <td style={{ padding: '8px 10px', color: m.income > 0 ? '#299D70' : '#667085' }}>
-                        {formatEuro(m.income)}
-                      </td>
-                      <td style={{ padding: '8px 10px', color: '#101828' }}>{formatEuro(m.expense)}</td>
-                      <td style={{ padding: '8px 10px', color: diffColor, fontWeight: 500 }}>{diffText}</td>
-                      <td style={{ padding: '8px 10px', color: m.net >= 0 ? '#101828' : '#B42318' }}>
-                        {formatEuro(m.net)}
-                      </td>
+                      <td style={{ color: m.income > 0 ? '#299D70' : '#667085' }}>{formatEuro(m.income)}</td>
+                      <td style={{ color: '#101828' }}>{formatEuro(m.expense)}</td>
+                      <td style={{ color: diffColor, fontWeight: 500 }}>{diffText}</td>
+                      <td style={{ color: m.net >= 0 ? '#101828' : '#B42318' }}>{formatEuro(m.net)}</td>
                     </tr>
                   );
                 })
@@ -372,9 +342,9 @@ export const AnalyticsView: React.FC = () => {
       </section>
 
       {/* Статистика по артикули от бележките */}
-      <section className="card" style={{ padding: '20px' }}>
+      <section className="card analytics-card" style={{ padding: '20px' }}>
         <div
-          className="card-heading"
+          className="card-heading analytics-items-head"
           style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -390,19 +360,13 @@ export const AnalyticsView: React.FC = () => {
             <p>Aggregated from transaction line items in {selectedYear}.</p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="analytics-item-search">
             <Icon name="search" size={16} />
             <input
               type="text"
               value={itemSearch}
               onChange={(e) => setItemSearch(e.target.value)}
               placeholder="Filter item name..."
-              style={{
-                padding: '7px 12px',
-                borderRadius: '8px',
-                border: '1px solid #D0D5DD',
-                fontSize: '0.875rem',
-              }}
             />
           </div>
         </div>
@@ -412,25 +376,23 @@ export const AnalyticsView: React.FC = () => {
             No receipt items found for {selectedYear}.
           </p>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+          <div className="analytics-table-wrap">
+            <table className="analytics-table">
               <thead>
-                <tr style={{ textAlign: 'left', borderBottom: '1px solid #EAECF0', color: '#667085' }}>
-                  <th style={{ padding: '8px 10px' }}>Item</th>
-                  <th style={{ padding: '8px 10px' }}>Total Qty</th>
-                  <th style={{ padding: '8px 10px' }}>Purchases</th>
-                  <th style={{ padding: '8px 10px' }}>Total Spent</th>
+                <tr>
+                  <th>Item</th>
+                  <th>Total Qty</th>
+                  <th>Purchases</th>
+                  <th>Total Spent</th>
                 </tr>
               </thead>
               <tbody>
                 {itemStats.slice(0, 20).map((item) => (
-                  <tr key={item.name} style={{ borderBottom: '1px solid #F2F4F7' }}>
-                    <td style={{ padding: '8px 10px', fontWeight: 500, color: '#101828' }}>{item.name}</td>
-                    <td style={{ padding: '8px 10px', color: '#475467' }}>{formatQty3(item.totalQuantity)}</td>
-                    <td style={{ padding: '8px 10px', color: '#475467' }}>{item.occurrences}</td>
-                    <td style={{ padding: '8px 10px', fontWeight: 600, color: '#101828' }}>
-                      {formatEuro(item.totalAmount)}
-                    </td>
+                  <tr key={item.name}>
+                    <td style={{ fontWeight: 500, color: '#101828' }}>{item.name}</td>
+                    <td style={{ color: '#475467' }}>{formatQty3(item.totalQuantity)}</td>
+                    <td style={{ color: '#475467' }}>{item.occurrences}</td>
+                    <td style={{ fontWeight: 600, color: '#101828' }}>{formatEuro(item.totalAmount)}</td>
                   </tr>
                 ))}
               </tbody>

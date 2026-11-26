@@ -6,7 +6,7 @@ interface YearlyOverviewBannerProps {
   yearlyIncome: number;
   yearlyExpense: number;
   expenseCount: number;
-
+  onViewTransactions?: () => void;
 }
 
 const STORAGE_KEY = 'financeflow_show_yearly_banner';
@@ -23,6 +23,7 @@ export const YearlyOverviewBanner: React.FC<YearlyOverviewBannerProps> = ({
   yearlyIncome,
   yearlyExpense,
   expenseCount,
+  onViewTransactions,
 }) => {
   const [isVisible, setIsVisible] = useState<boolean>(() => {
     try {
@@ -67,7 +68,7 @@ export const YearlyOverviewBanner: React.FC<YearlyOverviewBannerProps> = ({
 
   return (
     <section
-      className="card"
+      className="card yearly-banner-card"
       style={{
         marginTop: '16px',
         marginBottom: '20px',
@@ -85,8 +86,8 @@ export const YearlyOverviewBanner: React.FC<YearlyOverviewBannerProps> = ({
             width: '40px',
             height: '40px',
             borderRadius: '10px',
-            background: '#F4F3FF',
-            color: '#7A5AF8',
+            background: '#EEF4FF',
+            color: '#444CE7',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -108,14 +109,7 @@ export const YearlyOverviewBanner: React.FC<YearlyOverviewBannerProps> = ({
         </div>
       </div>
 
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '24px',
-        }}
-      >
+      <div className="yearly-banner-meta">
         <div>
           <span style={{ display: 'block', fontSize: '0.75rem', color: '#667085' }}>Income</span>
           <strong style={{ fontSize: '0.95rem', color: '#299D70' }}>
@@ -130,19 +124,16 @@ export const YearlyOverviewBanner: React.FC<YearlyOverviewBannerProps> = ({
           </strong>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div className="yearly-banner-actions">
+          {onViewTransactions && (
+            <button className="text-btn" onClick={onViewTransactions} type="button">
+              History <Icon name="chevron" size={15} />
+            </button>
+          )}
           <button
             type="button"
+            className="yearly-hide-btn"
             onClick={() => setIsVisible(false)}
-            style={{
-              background: 'none',
-              border: '1px solid #E4E7EC',
-              borderRadius: '6px',
-              padding: '4px 10px',
-              fontSize: '0.75rem',
-              color: '#667085',
-              cursor: 'pointer',
-            }}
           >
             Hide
           </button>
